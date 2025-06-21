@@ -1,184 +1,171 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import ProjectDetail from './ProjectDetail'
-import type { User } from '@supabase/supabase-js'
+import { useState, useEffect, FormEvent } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { PlusCircle, Loader2, AlertCircle, Trash2, Edit } from 'lucide-react'
 
 interface Project {
   id: string
   name: string
-  description: string
+  address: string
+  status: string
   created_at: string
-}
-
-interface Profile {
-    company_id: string;
 }
 
 export default function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-
   const [newProjectName, setNewProjectName] = useState('')
-  const [newProjectDescription, setNewProjectDescription] = useState('')
-  
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [newProjectAddress, setNewProjectAddress] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const supabase = createClientComponentClient()
 
-  const fetchUserData = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
 
-    if (user) {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-      } else {
-        setProfile(profileData);
+      if (user) {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('id, name, address, status, created_at')
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          setError(error.message)
+        } else {
+          setProjects(data)
+        }
       }
-    }
-  }, []);
-
-  const fetchProjects = useCallback(async () => {
-    if (!profile) return;
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setProjects(data || [])
-    } catch (error: any) {
-      alert(`Fehler beim Laden der Projekte: ${error.message}`)
-    } finally {
       setLoading(false)
     }
-  }, [profile]);
 
-  useEffect(() => {
-    fetchUserData();
-  }, [fetchUserData]);
+    fetchProjects()
+  }, [supabase])
 
-  useEffect(() => {
-    if (profile) {
-        fetchProjects();
-    }
-  }, [profile, fetchProjects]);
+  const handleAddProject = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
 
+    const { data: { user } } = await supabase.auth.getUser()
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim() || !user || !profile) return
-
-    try {
+    if (user && newProjectName && newProjectAddress) {
       const { data, error } = await supabase
         .from('projects')
-        .insert([{ 
-            name: newProjectName,
-            description: newProjectDescription,
-            created_by: user.id,
-            company_id: profile.company_id
-        }])
+        .insert({
+          name: newProjectName,
+          address: newProjectAddress,
+          created_by: user.id,
+          // company_id is set by a trigger/default in the database
+        })
         .select()
+        .single()
 
-      if (error) throw error
-
-      if (data) {
-        setProjects([data[0] as Project, ...projects])
+      if (error) {
+        setError(error.message)
+      } else if (data) {
+        setProjects([data, ...projects])
         setNewProjectName('')
-        setNewProjectDescription('')
+        setNewProjectAddress('')
       }
-    } catch (error: any) {
-      alert(`Fehler beim Erstellen des Projekts: ${error.message}`)
     }
-  }
-
-  if (selectedProject) {
-    return (
-      <ProjectDetail 
-        project={selectedProject}
-        onBack={() => setSelectedProject(null)} 
-      />
-    )
   }
 
   if (loading) {
-    return <div className="text-center py-8 text-foreground">Lade Projekte...</div>
+    return (
+        <div className="flex justify-center items-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+    )
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-8 text-foreground">Bauplaner</h1>
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+      <h2 className="text-2xl font-bold text-slate-800 mb-6">Projekte verwalten</h2>
       
-      <div className="bg-background-card rounded-lg shadow-md p-6 mb-8 border border-border-color">
-        <h2 className="text-xl font-semibold mb-4 text-foreground">Neues Projekt erstellen</h2>
-        <div className="space-y-4">
+      <form onSubmit={handleAddProject} className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div>
-            <label className="block text-sm font-medium text-foreground-muted mb-1">
-              Projektname
-            </label>
+            <label htmlFor="projectName" className="block text-sm font-medium text-slate-700 mb-1">Projektname</label>
             <input
+              id="projectName"
               type="text"
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
-              className="w-full px-3 py-2 border border-border-color rounded-md bg-background-input text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="z.B. Neubau EFH Meier"
+              required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground-muted mb-1">
-              Beschreibung
-            </label>
-            <textarea
-              value={newProjectDescription}
-              onChange={(e) => setNewProjectDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-border-color rounded-md bg-background-input text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Kurze Beschreibung des Projekts"
+            <label htmlFor="projectAddress" className="block text-sm font-medium text-slate-700 mb-1">Adresse</label>
+            <input
+              id="projectAddress"
+              type="text"
+              value={newProjectAddress}
+              onChange={(e) => setNewProjectAddress(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="z.B. Hauptstraße 1, 12345 Berlin"
+              required
             />
           </div>
-          <button
-            onClick={handleCreateProject}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Projekt erstellen
-          </button>
+          <div className="md:col-span-2">
+            <button
+              type="submit"
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <PlusCircle className="w-5 h-5" />
+              <span>Projekt hinzufügen</span>
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-foreground">Ihre Projekte</h2>
-        {projects.length === 0 ? (
-          <div className="text-center py-8 text-foreground-muted">
-            Noch keine Projekte vorhanden. Erstellen Sie Ihr erstes Projekt!
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {projects.map((project) => (
-              <div key={project.id} className="bg-background-card rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border border-border-color" onClick={() => setSelectedProject(project)}>
-                <h3 className="text-lg font-semibold mb-2 text-foreground">{project.name}</h3>
-                {project.description && (
-                  <p className="text-foreground-muted mb-3 line-clamp-2">{project.description}</p>
-                )}
-                <p className="text-sm text-foreground-muted mb-4">
-                  Erstellt am: {new Date(project.created_at).toLocaleDateString('de-DE')}
-                </p>
-                <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                  Details anzeigen →
-                </button>
-              </div>
-            ))}
-          </div>
+        {error && (
+            <div className="mt-4 bg-red-50 p-3 rounded-md flex items-center gap-2 text-sm text-red-600">
+                <AlertCircle className="h-5 w-5"/>
+                <span>Fehler: {error}</span>
+            </div>
         )}
+      </form>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200">
+          <thead className="bg-slate-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Projektname</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Erstellt am</th>
+              <th scope="col" className="relative px-6 py-3">
+                <span className="sr-only">Aktionen</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-slate-200">
+            {projects.map((project) => (
+              <tr key={project.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-slate-900">{project.name}</div>
+                  <div className="text-sm text-slate-500">{project.address}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      project.status === 'active' ? 'bg-green-100 text-green-800' :
+                      project.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-slate-100 text-slate-800'
+                  }`}>
+                    {project.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                  {new Date(project.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button className="text-blue-600 hover:text-blue-900 mr-4"><Edit className="w-4 h-4"/></button>
+                  <button className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4"/></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )

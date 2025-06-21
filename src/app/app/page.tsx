@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import ProjectList from '@/components/ProjectList'
@@ -23,7 +23,8 @@ import {
   Briefcase,
   User,
   Clock,
-  Wrench
+  Wrench,
+  Loader2
 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
@@ -37,8 +38,16 @@ export default function AppPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true);
 
   const router = useRouter()
+  const supabase = createClientComponentClient()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+    router.refresh();
+  }
 
   const fetchUserData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -52,13 +61,15 @@ export default function AppPage() {
       
       if (error) {
         console.error("Error fetching profile:", error);
+        router.push('/auth/login');
       } else {
         setProfile(profileData);
+        setLoading(false);
       }
     } else {
       router.push('/auth/login');
     }
-  }, [router]);
+  }, [router, supabase]);
 
   useEffect(() => {
     fetchUserData();
@@ -72,11 +83,6 @@ export default function AppPage() {
     { id: 'employees', label: 'Mitarbeiter', icon: Users },
     { id: 'timesheets', label: 'Stundenzettel', icon: Clock },
   ]
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  }
 
   const mainContent = () => {
     switch (activeTab) {
@@ -94,6 +100,14 @@ export default function AppPage() {
           </div>
         )
     }
+  }
+
+  if (loading) {
+    return (
+        <div className="flex justify-center items-center min-h-screen bg-slate-50">
+            <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
+        </div>
+    )
   }
 
   return (
