@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Material {
@@ -31,11 +31,7 @@ export default function MaterialManagement({ projectId }: MaterialManagementProp
     supplier: ''
   })
 
-  useEffect(() => {
-    fetchMaterials()
-  }, [projectId])
-
-  async function fetchMaterials() {
+  const fetchMaterials = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('materials')
@@ -50,7 +46,13 @@ export default function MaterialManagement({ projectId }: MaterialManagementProp
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    if (projectId) {
+      fetchMaterials()
+    }
+  }, [projectId, fetchMaterials])
 
   async function addMaterial() {
     if (!newMaterial.name.trim() || !newMaterial.quantity || !newMaterial.cost_per_unit) return

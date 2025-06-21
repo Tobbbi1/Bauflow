@@ -35,8 +35,12 @@ export default function LoginPage() {
       } else {
         setError(data.error || 'Login fehlgeschlagen')
       }
-    } catch (err) {
-      setError('Ein Fehler ist aufgetreten')
+    } catch (error) { // Changed 'err' to 'error' to match usage
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('Ein Fehler ist aufgetreten')
+      }
     } finally {
       setIsLoading(false)
     }

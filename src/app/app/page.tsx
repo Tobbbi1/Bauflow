@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import ProjectList from '@/components/ProjectList'
@@ -17,7 +19,6 @@ import {
   Bell,
   PlusCircle,
   Camera,
-  User,
   Menu,
   X
 } from 'lucide-react'

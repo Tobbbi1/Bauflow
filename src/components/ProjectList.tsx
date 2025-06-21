@@ -16,6 +16,9 @@ export default function ProjectList() {
   const [loading, setLoading] = useState(true)
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
 
   useEffect(() => {
     fetchProjects()
@@ -60,11 +63,39 @@ export default function ProjectList() {
     }
   }
 
-  if (selectedProjectId) {
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([{ name: newProjectName }])
+        .select()
+
+      if (error) throw error
+
+      if (data) {
+        setProjects([...projects, data[0] as Project])
+        setIsCreating(false)
+        setNewProjectName('')
+      }
+    } catch (error: any) {
+      console.error('Fehler beim Erstellen des Projekts:', error)
+      if (error) {
+        alert(`Fehler beim Erstellen des Projekts: ${error.message}`)
+      }
+    }
+  }
+
+  const handleSelectProject = (project: Project) => {
+    setSelectedProject(project)
+  }
+
+  if (selectedProject) {
     return (
       <ProjectDetail 
-        projectId={selectedProjectId} 
-        onBack={() => setSelectedProjectId(null)} 
+        project={selectedProject} // Pass the whole project object
+        onBack={() => setSelectedProject(null)} 
       />
     )
   }
@@ -87,8 +118,8 @@ export default function ProjectList() {
             </label>
             <input
               type="text"
-              value={newProject.name}
-              onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Projektname eingeben"
             />
@@ -106,7 +137,7 @@ export default function ProjectList() {
             />
           </div>
           <button
-            onClick={addProject}
+            onClick={handleCreateProject}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
           >
             Projekt erstellen
@@ -124,7 +155,7 @@ export default function ProjectList() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {projects.map((project) => (
-              <div key={project.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setSelectedProjectId(project.id)}>
+              <div key={project.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleSelectProject(project)}>
                 <h3 className="text-lg font-semibold mb-2">{project.name}</h3>
                 {project.description && (
                   <p className="text-gray-600 mb-3 line-clamp-2">{project.description}</p>

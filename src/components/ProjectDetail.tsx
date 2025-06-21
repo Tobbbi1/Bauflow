@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Check, Edit, PlusCircle, Trash, ArrowLeft } from 'lucide-react'
 
 interface Task {
   id: string
   title: string
   description: string
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  status: string
   priority: 'low' | 'medium' | 'high' | 'urgent'
   due_date: string | null
   created_at: string
@@ -25,8 +26,7 @@ interface ProjectDetailProps {
   onBack: () => void
 }
 
-export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
-  const [project, setProject] = useState<Project | null>(null)
+export default function ProjectDetail({ project, onBack }: { project: any; onBack: () => void }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [newTask, setNewTask] = useState({
@@ -36,27 +36,22 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
     due_date: ''
   })
 
-  useEffect(() => {
-    fetchProjectAndTasks()
-  }, [projectId])
-
-  async function fetchProjectAndTasks() {
+  const fetchProjectAndTasks = useCallback(async () => {
     try {
       // Projekt laden
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select('*')
-        .eq('id', projectId)
+        .eq('id', project.id)
         .single()
 
       if (projectError) throw projectError
-      setProject(projectData)
 
       // Aufgaben laden
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('project_id', project.id)
         .order('created_at', { ascending: false })
 
       if (tasksError) throw tasksError
@@ -66,7 +61,11 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
     } finally {
       setLoading(false)
     }
-  }
+  }, [project.id])
+
+  useEffect(() => {
+    fetchProjectAndTasks()
+  }, [fetchProjectAndTasks])
 
   async function addTask() {
     if (!newTask.title.trim()) return
@@ -75,7 +74,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
       const { error } = await supabase
         .from('tasks')
         .insert([{
-          project_id: projectId,
+          project_id: project.id,
           title: newTask.title,
           description: newTask.description,
           priority: newTask.priority,
@@ -96,11 +95,11 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
     }
   }
 
-  async function updateTaskStatus(taskId: string, status: Task['status']) {
+  const handleUpdateTask = async (taskId: string, updatedFields: any) => {
     try {
       const { error } = await supabase
         .from('tasks')
-        .update({ status })
+        .update(updatedFields)
         .eq('id', taskId)
 
       if (error) throw error
@@ -243,7 +242,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
                       </span>
                       <select
                         value={task.status}
-                        onChange={(e) => updateTaskStatus(task.id, e.target.value as Task['status'])}
+                        onChange={(e) => handleUpdateTask(task.id, { status: e.target.value })}
                         className={`px-2 py-1 rounded-full text-xs font-medium border-0 ${getStatusColor(task.status)}`}
                       >
                         <option value="pending">Ausstehend</option>

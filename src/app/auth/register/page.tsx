@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, User, Building, Phone, AlertCircle, CheckCircle } from 'lucide-react'
 import Logo from '@/components/Logo'
+import { supabase } from '@/lib/supabase'
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1)
@@ -59,11 +60,18 @@ export default function RegisterPage() {
       if (response.ok) {
         setSuccess(true)
         setStep(3)
+        // No redirect needed here, the success message is shown.
+        // If a redirect is desired, it would be:
+        // router.push('/auth/login');
       } else {
         setError(data.error || 'Registrierung fehlgeschlagen')
       }
-    } catch (err) {
-      setError('Ein Fehler ist aufgetreten')
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('Ein Fehler ist aufgetreten')
+      }
     } finally {
       setIsLoading(false)
     }

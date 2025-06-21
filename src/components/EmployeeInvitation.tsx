@@ -60,8 +60,12 @@ export default function EmployeeInvitation({ companyId, onInvitationSent }: Empl
       } else {
         setError(data.error || 'Einladung fehlgeschlagen')
       }
-    } catch (err) {
-      setError('Ein Fehler ist aufgetreten')
+    } catch (error) { // Correct catch block
+      if (error instanceof Error) {
+        alert(`Fehler: ${error.message}`)
+      } else {
+        alert('Ein unbekannter Fehler ist aufgetreten.')
+      }
     } finally {
       setIsLoading(false)
     }
