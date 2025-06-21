@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Logo from '@/components/Logo'
 import { Mail, Lock, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
 
@@ -15,36 +14,34 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  const supabase = createClientComponentClient()
-
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-      if (error) {
-        throw error
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.error === 'Invalid login credentials') {
+          throw new Error('Falsche E-Mail-Adresse oder Passwort. Bitte versuchen Sie es erneut.');
+        } else if (data.error === 'Email not confirmed') {
+          throw new Error('Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Wir haben Ihnen eine neue E-Mail gesendet.');
+        }
+        throw new Error(data.error || 'Ein unbekannter Fehler ist aufgetreten.');
       }
+      
+      router.push('/app');
+      router.refresh();
 
-      // On successful login, redirect to the app dashboard.
-      // The auth listener in the main layout will handle the user session.
-      router.push('/app')
-      router.refresh() // Ensures the page re-renders with the new auth state
-
-    } catch (e: any) {
-      if (e.message === 'Invalid login credentials') {
-          setError('Falsche E-Mail-Adresse oder Passwort. Bitte versuchen Sie es erneut.')
-      } else if (e.message === 'Email not confirmed') {
-          setError('Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse, bevor Sie sich anmelden.')
-      } else {
-          setError('Ein unerwarteter Fehler ist aufgetreten: ' + e.message)
-      }
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false)
     }
@@ -96,7 +93,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 pl-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none block w-full px-3 py-2 pl-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
                   placeholder="ihre@email.de"
                 />
               </div>
@@ -127,7 +124,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 pl-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none block w-full px-3 py-2 pl-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900"
                 />
                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-500">

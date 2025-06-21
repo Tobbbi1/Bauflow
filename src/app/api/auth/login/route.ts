@@ -1,24 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
   const { email, password } = await request.json()
-
-  if (!email || !password) {
-    return NextResponse.json({ error: 'E-Mail und Passwort sind erforderlich' }, { status: 400 })
-  }
+  const supabase = createRouteHandlerClient({ cookies })
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
+  // If email is not confirmed, Supabase returns data but with a null session.
+  // The error object is also null in this case. We need to check for this explicitly.
+  if (data.user && data.user.aud !== 'authenticated') {
+      // Optionally, re-send the confirmation email
+      await supabase.auth.resend({ type: 'signup', email: email });
+      return NextResponse.json({ error: 'Email not confirmed' }, { status: 401 });
+  }
+
   if (error) {
     return NextResponse.json({ error: error.message }, { status: error.status || 401 })
   }
 
-  // We don't need to fetch the profile here, the client can do that after login.
-  // The session is now set in the cookies by the Supabase client.
-  return NextResponse.json({ user: data.user })
+  return NextResponse.json({ message: 'Login successful' }, { status: 200 })
 } 
