@@ -104,7 +104,7 @@ CREATE TABLE projects (
     status VARCHAR(50) DEFAULT 'planning',
     budget DECIMAL(10,2),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-    created_by UUID REFERENCES users(id),
+    created_by UUID REFERENCES public.profiles(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -115,8 +115,8 @@ CREATE TABLE tasks (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    assigned_to UUID REFERENCES users(id),
-    assigned_by UUID REFERENCES users(id),
+    assigned_to UUID REFERENCES public.profiles(id),
+    assigned_by UUID REFERENCES public.profiles(id),
     status VARCHAR(50) DEFAULT 'pending',
     priority VARCHAR(20) DEFAULT 'medium',
     due_date TIMESTAMP WITH TIME ZONE,
@@ -129,7 +129,7 @@ CREATE TABLE tasks (
 -- Time tracking table
 CREATE TABLE time_entries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -164,7 +164,7 @@ CREATE TABLE project_materials (
     material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
     quantity DECIMAL(10,2) NOT NULL,
     used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by UUID REFERENCES users(id),
+    created_by UUID REFERENCES public.profiles(id),
     UNIQUE(project_id, material_id)
 );
 
@@ -172,7 +172,7 @@ CREATE TABLE project_materials (
 CREATE TABLE employee_invitations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-    invited_by UUID REFERENCES users(id),
+    invited_by UUID REFERENCES public.profiles(id),
     email VARCHAR(255) NOT NULL,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
@@ -184,12 +184,12 @@ CREATE TABLE employee_invitations (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_company_id ON users(company_id);
+DROP INDEX IF EXISTS idx_users_email;
+DROP INDEX IF EXISTS idx_users_company_id;
+CREATE INDEX idx_profiles_company_id ON public.profiles(company_id);
 CREATE INDEX idx_projects_company_id ON projects(company_id);
 CREATE INDEX idx_tasks_project_id ON tasks(project_id);
 CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
-CREATE INDEX idx_time_entries_user_id ON time_entries(user_id);
 CREATE INDEX idx_time_entries_project_id ON time_entries(project_id);
 CREATE INDEX idx_materials_company_id ON materials(company_id);
 CREATE INDEX idx_employee_invitations_email ON employee_invitations(email);
@@ -206,7 +206,7 @@ $$ language 'plpgsql';
 
 -- Apply updated_at triggers
 CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_time_entries_updated_at BEFORE UPDATE ON time_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -214,7 +214,7 @@ CREATE TRIGGER update_materials_updated_at BEFORE UPDATE ON materials FOR EACH R
 
 -- Row Level Security (RLS) policies
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
@@ -224,84 +224,59 @@ ALTER TABLE employee_invitations ENABLE ROW LEVEL SECURITY;
 
 -- Company policies
 CREATE POLICY "Users can view their own company" ON companies
-    FOR SELECT USING (id IN (SELECT company_id FROM users WHERE id = auth.uid()));
+    FOR SELECT USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
 
 CREATE POLICY "Admins can manage their company" ON companies
-    FOR ALL USING (id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role = 'admin'));
+    FOR ALL USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- User policies
-CREATE POLICY "Users can view company members" ON users
-    FOR SELECT USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid()));
+CREATE POLICY "Users can view their own profile" ON public.profiles
+    FOR SELECT USING (id = auth.uid());
 
-CREATE POLICY "Admins can manage company users" ON users
-    FOR ALL USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Users can view company members" ON public.profiles
+    FOR SELECT USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Admins can manage company users" ON public.profiles
+    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- Project policies
 CREATE POLICY "Users can view company projects" ON projects
-    FOR SELECT USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid()));
+    FOR SELECT USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
 
 CREATE POLICY "Managers and admins can manage projects" ON projects
-    FOR ALL USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role IN ('admin', 'manager')));
+    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')));
 
 -- Task policies
 CREATE POLICY "Users can view company tasks" ON tasks
-    FOR SELECT USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM users WHERE id = auth.uid())));
+    FOR SELECT USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid())));
 
 CREATE POLICY "Users can update assigned tasks" ON tasks
     FOR UPDATE USING (assigned_to = auth.uid());
 
 CREATE POLICY "Managers and admins can manage tasks" ON tasks
-    FOR ALL USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
+    FOR ALL USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
 
 -- Time entry policies
-CREATE POLICY "Users can manage their own time entries" ON time_entries
+CREATE POLICY "Users can only manage their own time entries" ON time_entries
     FOR ALL USING (user_id = auth.uid());
 
-CREATE POLICY "Managers can view company time entries" ON time_entries
-    FOR SELECT USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
+CREATE POLICY "Managers and admins can view all time entries" ON time_entries
+    FOR SELECT USING (user_id IN (SELECT id FROM public.profiles WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
 
 -- Material policies
 CREATE POLICY "Users can view company materials" ON materials
-    FOR SELECT USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid()));
+    FOR SELECT USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
 
 CREATE POLICY "Managers and admins can manage materials" ON materials
-    FOR ALL USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role IN ('admin', 'manager')));
+    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')));
 
--- Project materials policies
-CREATE POLICY "Users can view project materials" ON project_materials
-    FOR SELECT USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM users WHERE id = auth.uid())));
-
-CREATE POLICY "Managers and admins can manage project materials" ON project_materials
-    FOR ALL USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
+-- Project material policies
+CREATE POLICY "Users can manage materials on their projects" ON project_materials
+    FOR ALL USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid())));
 
 -- Employee invitation policies
-CREATE POLICY "Admins can manage invitations" ON employee_invitations
-    FOR ALL USING (company_id IN (SELECT company_id FROM users WHERE id = auth.uid() AND role = 'admin'));
-
--- Policies for profiles table
--- 1. Users can view their own profile.
-CREATE POLICY "Users can view their own profile"
-ON public.profiles FOR SELECT
-USING (auth.uid() = id);
-
--- 2. Users can update their own profile.
-CREATE POLICY "Users can update their own profile"
-ON public.profiles FOR UPDATE
-USING (auth.uid() = id)
-WITH CHECK (auth.uid() = id);
-
--- 3. Admins can view all profiles within their own company.
-CREATE POLICY "Admins can view profiles in their own company"
-ON public.profiles FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1
-    FROM profiles p
-    WHERE p.id = auth.uid()
-      AND p.role = 'admin'
-      AND p.company_id = profiles.company_id
-  )
-);
+CREATE POLICY "Admins can manage invitations for their company" ON employee_invitations
+    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- Insert sample data for testing
 INSERT INTO companies (name, address, phone, email) VALUES 
