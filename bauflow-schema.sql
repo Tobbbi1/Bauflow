@@ -222,12 +222,25 @@ ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employee_invitations ENABLE ROW LEVEL SECURITY;
 
--- Company policies
-CREATE POLICY "Users can view their own company" ON companies
-    FOR SELECT USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+-- Remove old company policies to avoid conflicts
+DROP POLICY IF EXISTS "Users can view their own company" ON companies;
+DROP POLICY IF EXISTS "Admins can manage their company" ON companies;
 
-CREATE POLICY "Admins can manage their company" ON companies
-    FOR ALL USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+-- Company RLS Policies
+-- 1. Allow authenticated users to insert a new company.
+CREATE POLICY "Allow authenticated users to create companies"
+  ON public.companies FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- 2. Allow users to view the company they belong to.
+CREATE POLICY "Allow users to view their own company"
+  ON public.companies FOR SELECT
+  USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+
+-- 3. Allow company admins to update or delete their company.
+CREATE POLICY "Allow company admins to update and delete"
+  ON public.companies FOR UPDATE, DELETE
+  USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- User policies
 CREATE POLICY "Users can view their own profile" ON public.profiles
