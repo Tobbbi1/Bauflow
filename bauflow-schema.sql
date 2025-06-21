@@ -222,25 +222,40 @@ ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employee_invitations ENABLE ROW LEVEL SECURITY;
 
--- Remove old company policies to avoid conflicts
+-- Remove old/incorrect company policies to avoid conflicts
 DROP POLICY IF EXISTS "Users can view their own company" ON companies;
 DROP POLICY IF EXISTS "Admins can manage their company" ON companies;
+DROP POLICY IF EXISTS "Allow authenticated users to create companies" ON companies;
+DROP POLICY IF EXISTS "Allow users to view their own company" ON companies;
+DROP POLICY IF EXISTS "Allow company admins to update and delete" ON companies;
+-- Also drop the new split policies in case of re-running
+DROP POLICY IF EXISTS "Allow company admins to update" ON companies;
+DROP POLICY IF EXISTS "Allow company admins to delete" ON companies;
+
 
 -- Company RLS Policies
--- 1. Allow authenticated users to insert a new company.
-CREATE POLICY "Allow authenticated users to create companies"
+-- 1. Allow any user (including anonymous ones) to create a company.
+-- This is required for the signup flow where the company is created before the user.
+-- The API route ensures this is handled securely.
+CREATE POLICY "Allow company creation during signup"
   ON public.companies FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated');
+  WITH CHECK (true);
 
 -- 2. Allow users to view the company they belong to.
 CREATE POLICY "Allow users to view their own company"
   ON public.companies FOR SELECT
   USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
 
--- 3. Allow company admins to update or delete their company.
-CREATE POLICY "Allow company admins to update and delete"
-  ON public.companies FOR UPDATE, DELETE
+-- 3. Allow company admins to update their company.
+CREATE POLICY "Allow company admins to update"
+  ON public.companies FOR UPDATE
   USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- 4. Allow company admins to delete their company.
+CREATE POLICY "Allow company admins to delete"
+  ON public.companies FOR DELETE
+  USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
 
 -- User policies
 CREATE POLICY "Users can view their own profile" ON public.profiles
