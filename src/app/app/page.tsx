@@ -192,10 +192,10 @@ export default function AppPage() {
               </button>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                  {profile ? `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}` : <User size={20}/>}
+                  {profile && profile.first_name && profile.last_name ? `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}` : <User size={20}/>}
                 </div>
                 <div className="hidden md:flex flex-col text-right">
-                    <span className="font-medium text-slate-800 text-sm">{profile ? `${profile.first_name} ${profile.last_name}` : 'Lade...'}</span>
+                    <span className="font-medium text-slate-800 text-sm">{profile && profile.first_name ? `${profile.first_name} ${profile.last_name}` : 'Benutzer'}</span>
                     <span className="text-xs text-slate-500">Admin</span>
                 </div>
               </div>
@@ -223,7 +223,7 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
   return (
     <div>
       <h1 className="text-3xl font-bold text-slate-900 mb-2">
-        Willkommen zurück, {profile ? profile.first_name : '...'}!
+        Willkommen zurück, {profile && profile.first_name ? profile.first_name : 'Nutzer'}!
       </h1>
       <p className="text-lg text-slate-600 mb-8">
         Hier ist Ihr Überblick für heute.
