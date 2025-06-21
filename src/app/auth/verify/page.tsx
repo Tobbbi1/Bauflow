@@ -1,138 +1,90 @@
 'use client'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
-import Logo from '@/components/Logo'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase' // Correctly import the supabase instance
-
-function VerifyComponent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
-  const [message, setMessage] = useState('E-Mail-Adresse wird bestätigt...')
-
-  const handleVerification = useCallback(async () => {
-    const code = searchParams.get('code')
-
-    if (!code) {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user?.email_confirmed_at) {
-        setStatus('success')
-        setMessage('Ihre E-Mail-Adresse ist bereits bestätigt. Sie werden weitergeleitet.')
-        setTimeout(() => router.push('/app'), 3000)
-        return
-      }
-
-      setStatus('error')
-      setMessage('Kein Verifizierungscode im Link gefunden. Bitte versuchen Sie es erneut.')
-      return
-    }
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (!error) {
-      setStatus('success')
-      setMessage('Ihre E-Mail-Adresse wurde erfolgreich bestätigt! Sie werden in Kürze zum Login weitergeleitet.')
-      setTimeout(() => {
-        router.push('/auth/login')
-      }, 3000)
-    } else {
-      setStatus('error')
-      setMessage(error.message || 'Ein Fehler ist bei der Bestätigung aufgetreten.')
-    }
-  }, [router, searchParams])
-
-  useEffect(() => {
-    handleVerification()
-  }, [handleVerification])
-
-
-  const getStatusIcon = () => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle className="h-12 w-12 text-green-500" />
-      case 'error':
-        return <XCircle className="h-12 w-12 text-red-500" />
-      default:
-        return <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <Link href="/" className="flex items-center gap-3">
-            <Logo />
-            <span className="text-2xl font-bold text-slate-800">Bauflow</span>
-          </Link>
-        </div>
-        
-        <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <div className="text-center">
-            {getStatusIcon()}
-            
-            <h2 className={`mt-4 text-2xl font-bold ${status === 'success' ? 'text-green-600' : status === 'error' ? 'text-red-600' : 'text-blue-600'}`}>
-              {status === 'loading' && 'E-Mail wird bestätigt...'}
-              {status === 'success' && 'E-Mail bestätigt!'}
-              {status === 'error' && 'Bestätigung fehlgeschlagen'}
-            </h2>
-            
-            <p className="mt-2 text-sm text-slate-600">
-              {message}
-            </p>
-
-            {status === 'success' && (
-              <div className="mt-6">
-                <p className="text-sm">Sie werden automatisch weitergeleitet.</p>
-              </div>
-            )}
-
-            {status === 'error' && (
-              <div className="mt-6 space-y-3">
-                <Link
-                  href="/auth/register"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-blue-500/50"
-                >
-                  Erneut registrieren
-                </Link>
-                <div>
-                  <Link
-                    href="/auth/login"
-                    className="text-sm text-blue-600 hover:text-blue-500"
-                  >
-                    Zur Anmeldung
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-6">
-              <Link
-                href="/"
-                className="text-sm text-slate-600 hover:text-slate-500"
-              >
-                Zurück zur Startseite
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
+import Link from 'next/link'
 
 export default function VerifyPage() {
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const handleVerification = async () => {
+      // PKCE Flow uses a 'code' in the URL search params, not a token in the hash.
+      const code = new URL(window.location.href).searchParams.get('code')
+
+      if (code) {
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) {
+            throw error
+          }
+          setStatus('success')
+          // Redirect to the app dashboard after a short delay
+          setTimeout(() => {
+            router.push('/app')
+          }, 3000)
+        } catch (e: any) {
+          setError(e.message || 'Ein unbekannter Fehler ist aufgetreten.')
+          setStatus('error')
+        }
+      } else {
+        setError('Kein gültiger Bestätigungscode in der URL gefunden.')
+        setStatus('error')
+      }
+    }
+
+    handleVerification()
+  }, [router])
+
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
+    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4 text-center">
+      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
+        {status === 'loading' && (
+          <>
+            <Loader2 className="mx-auto h-12 w-12 animate-spin text-blue-600" />
+            <h1 className="mt-4 text-2xl font-bold text-slate-800">
+              Bestätigung wird überprüft...
+            </h1>
+            <p className="mt-2 text-slate-600">
+              Bitte haben Sie einen Moment Geduld, wir verifizieren Ihr Konto.
+            </p>
+          </>
+        )}
+        {status === 'success' && (
+          <>
+            <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+            <h1 className="mt-4 text-2xl font-bold text-slate-800">
+              Konto erfolgreich bestätigt!
+            </h1>
+            <p className="mt-2 text-slate-600">
+              Sie werden in Kürze zu Ihrem Dashboard weitergeleitet.
+            </p>
+          </>
+        )}
+        {status === 'error' && (
+          <>
+            <XCircle className="mx-auto h-12 w-12 text-red-500" />
+            <h1 className="mt-4 text-2xl font-bold text-slate-800">
+              Fehler bei der Bestätigung
+            </h1>
+            <p className="mt-2 text-slate-600">
+              Leider gab es ein Problem bei der Bestätigung Ihres Kontos.
+            </p>
+            {error && (
+              <p className="mt-2 text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                {error}
+              </p>
+            )}
+             <Link href="/auth/login" className="mt-6 inline-block w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+              Zurück zum Login
+            </Link>
+          </>
+        )}
       </div>
-    }>
-      <VerifyComponent />
-    </Suspense>
+    </div>
   )
 } 

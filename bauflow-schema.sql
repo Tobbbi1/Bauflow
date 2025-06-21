@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Companies table
-CREATE TABLE companies (
+CREATE TABLE public.companies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     address TEXT,
@@ -91,7 +91,7 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_user();
 
 -- Projects table
-CREATE TABLE projects (
+CREATE TABLE public.projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -103,18 +103,18 @@ CREATE TABLE projects (
     end_date DATE,
     status VARCHAR(50) DEFAULT 'planning',
     budget DECIMAL(10,2),
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
     created_by UUID REFERENCES public.profiles(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Tasks table
-CREATE TABLE tasks (
+CREATE TABLE public.tasks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
     assigned_to UUID REFERENCES public.profiles(id),
     assigned_by UUID REFERENCES public.profiles(id),
     status VARCHAR(50) DEFAULT 'pending',
@@ -127,11 +127,11 @@ CREATE TABLE tasks (
 );
 
 -- Time tracking table
-CREATE TABLE time_entries (
+CREATE TABLE public.time_entries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time TIMESTAMP WITH TIME ZONE,
     duration_minutes INTEGER,
@@ -142,7 +142,7 @@ CREATE TABLE time_entries (
 );
 
 -- Materials table
-CREATE TABLE materials (
+CREATE TABLE public.materials (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -152,16 +152,16 @@ CREATE TABLE materials (
     min_stock_level INTEGER DEFAULT 0,
     supplier VARCHAR(255),
     supplier_contact VARCHAR(255),
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Project materials (many-to-many relationship)
-CREATE TABLE project_materials (
+CREATE TABLE public.project_materials (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    material_id UUID REFERENCES public.materials(id) ON DELETE CASCADE,
     quantity DECIMAL(10,2) NOT NULL,
     used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by UUID REFERENCES public.profiles(id),
@@ -169,9 +169,9 @@ CREATE TABLE project_materials (
 );
 
 -- Employee invitations table
-CREATE TABLE employee_invitations (
+CREATE TABLE public.employee_invitations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
     invited_by UUID REFERENCES public.profiles(id),
     email VARCHAR(255) NOT NULL,
     first_name VARCHAR(100),
@@ -187,13 +187,13 @@ CREATE TABLE employee_invitations (
 DROP INDEX IF EXISTS idx_users_email;
 DROP INDEX IF EXISTS idx_users_company_id;
 CREATE INDEX idx_profiles_company_id ON public.profiles(company_id);
-CREATE INDEX idx_projects_company_id ON projects(company_id);
-CREATE INDEX idx_tasks_project_id ON tasks(project_id);
-CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
-CREATE INDEX idx_time_entries_project_id ON time_entries(project_id);
-CREATE INDEX idx_materials_company_id ON materials(company_id);
-CREATE INDEX idx_employee_invitations_email ON employee_invitations(email);
-CREATE INDEX idx_employee_invitations_token ON employee_invitations(invitation_token);
+CREATE INDEX idx_projects_company_id ON public.projects(company_id);
+CREATE INDEX idx_tasks_project_id ON public.tasks(project_id);
+CREATE INDEX idx_tasks_assigned_to ON public.tasks(assigned_to);
+CREATE INDEX idx_time_entries_project_id ON public.time_entries(project_id);
+CREATE INDEX idx_materials_company_id ON public.materials(company_id);
+CREATE INDEX idx_employee_invitations_email ON public.employee_invitations(email);
+CREATE INDEX idx_employee_invitations_token ON public.employee_invitations(invitation_token);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -205,109 +205,113 @@ END;
 $$ language 'plpgsql';
 
 -- Apply updated_at triggers
-CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_time_entries_updated_at BEFORE UPDATE ON time_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_materials_updated_at BEFORE UPDATE ON materials FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON public.projects FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON public.tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_time_entries_updated_at BEFORE UPDATE ON public.time_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_materials_updated_at BEFORE UPDATE ON public.materials FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Helper Functions to prevent RLS recursion
+-- These functions are SECURITY DEFINER, which means they bypass RLS checks
+-- and can safely query user data without causing an infinite loop.
+
+CREATE OR REPLACE FUNCTION get_user_company_id(user_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+  RETURN (SELECT company_id FROM public.profiles WHERE id = user_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_user_role(user_id UUID)
+RETURNS user_role
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+  RETURN (SELECT role FROM public.profiles WHERE id = user_id);
+END;
+$$;
+
 
 -- Row Level Security (RLS) policies
-ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+-- Drop all old policies to ensure a clean slate
+DROP POLICY IF EXISTS "Users can view their own company" ON public.companies;
+DROP POLICY IF EXISTS "Admins can manage their company" ON public.companies;
+DROP POLICY IF EXISTS "Allow authenticated users to create companies" ON public.companies;
+DROP POLICY IF EXISTS "Allow users to view their own company" ON public.companies;
+DROP POLICY IF EXISTS "Allow company admins to update and delete" ON public.companies;
+DROP POLICY IF EXISTS "Allow company creation during signup" ON public.companies;
+DROP POLICY IF EXISTS "Allow company admins to update" ON public.companies;
+DROP POLICY IF EXISTS "Allow company admins to delete" ON public.companies;
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view company members" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can manage company users" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view company projects" ON public.projects;
+DROP POLICY IF EXISTS "Managers and admins can manage projects" ON public.projects;
+DROP POLICY IF EXISTS "Users can view company tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Users can update assigned tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Managers and admins can manage tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Users can only manage their own time entries" ON public.time_entries;
+DROP POLICY IF EXISTS "Managers and admins can view all time entries" ON public.time_entries;
+DROP POLICY IF EXISTS "Users can view company materials" ON public.materials;
+DROP POLICY IF EXISTS "Managers and admins can manage materials" ON public.materials;
+DROP POLICY IF EXISTS "Users can manage materials on their projects" ON public.project_materials;
+DROP POLICY IF EXISTS "Admins can manage invitations for their company" ON public.employee_invitations;
+
+
+ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE project_materials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE employee_invitations ENABLE ROW LEVEL SECURITY;
-
--- Remove old/incorrect company policies to avoid conflicts
-DROP POLICY IF EXISTS "Users can view their own company" ON companies;
-DROP POLICY IF EXISTS "Admins can manage their company" ON companies;
-DROP POLICY IF EXISTS "Allow authenticated users to create companies" ON companies;
-DROP POLICY IF EXISTS "Allow users to view their own company" ON companies;
-DROP POLICY IF EXISTS "Allow company admins to update and delete" ON companies;
--- Also drop the new split policies in case of re-running
-DROP POLICY IF EXISTS "Allow company admins to update" ON companies;
-DROP POLICY IF EXISTS "Allow company admins to delete" ON companies;
-
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.time_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_invitations ENABLE ROW LEVEL SECURITY;
 
 -- Company RLS Policies
--- 1. Allow any user (including anonymous ones) to create a company.
--- This is required for the signup flow where the company is created before the user.
--- The API route ensures this is handled securely.
-CREATE POLICY "Allow company creation during signup"
-  ON public.companies FOR INSERT
-  WITH CHECK (true);
+CREATE POLICY "Allow company creation during signup" ON public.companies FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can view their own company" ON public.companies FOR SELECT USING (id = get_user_company_id(auth.uid()));
+CREATE POLICY "Admins can update their company" ON public.companies FOR UPDATE USING (id = get_user_company_id(auth.uid()) AND get_user_role(auth.uid()) = 'admin');
+CREATE POLICY "Admins can delete their company" ON public.companies FOR DELETE USING (id = get_user_company_id(auth.uid()) AND get_user_role(auth.uid()) = 'admin');
 
--- 2. Allow users to view the company they belong to.
-CREATE POLICY "Allow users to view their own company"
-  ON public.companies FOR SELECT
-  USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+-- Profiles RLS Policies
+CREATE POLICY "Users can view their own profile and company members" ON public.profiles FOR SELECT USING (id = auth.uid() OR company_id = get_user_company_id(auth.uid()));
+CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Admins can manage users in their company" ON public.profiles FOR ALL USING (company_id = get_user_company_id(auth.uid()) AND get_user_role(auth.uid()) = 'admin');
 
--- 3. Allow company admins to update their company.
-CREATE POLICY "Allow company admins to update"
-  ON public.companies FOR UPDATE
-  USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+-- Project RLS Policies
+CREATE POLICY "Users can view projects in their company" ON public.projects FOR SELECT USING (company_id = get_user_company_id(auth.uid()));
+CREATE POLICY "Managers and admins can manage projects" ON public.projects FOR ALL USING (company_id = get_user_company_id(auth.uid()) AND get_user_role(auth.uid()) IN ('admin', 'manager'));
 
--- 4. Allow company admins to delete their company.
-CREATE POLICY "Allow company admins to delete"
-  ON public.companies FOR DELETE
-  USING (id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+-- Task RLS Policies
+CREATE POLICY "Users can view tasks in their company" ON public.tasks FOR SELECT USING (project_id IN (SELECT id FROM public.projects WHERE company_id = get_user_company_id(auth.uid())));
+CREATE POLICY "Users can update their assigned tasks" ON public.tasks FOR UPDATE USING (assigned_to = auth.uid());
+CREATE POLICY "Managers and admins can manage tasks" ON public.tasks FOR ALL USING (project_id IN (SELECT id FROM public.projects WHERE company_id = get_user_company_id(auth.uid())) AND get_user_role(auth.uid()) IN ('admin', 'manager'));
 
+-- Time Entry RLS Policies
+CREATE POLICY "Users can manage their own time entries" ON public.time_entries FOR ALL USING (user_id = auth.uid());
+CREATE POLICY "Admins/Managers can view all company time entries" ON public.time_entries FOR SELECT USING (get_user_role(auth.uid()) IN ('admin', 'manager') AND user_id IN (SELECT id FROM public.profiles WHERE company_id = get_user_company_id(auth.uid())));
 
--- User policies
-CREATE POLICY "Users can view their own profile" ON public.profiles
-    FOR SELECT USING (id = auth.uid());
+-- Material RLS Policies
+CREATE POLICY "Users can view materials in their company" ON public.materials FOR SELECT USING (company_id = get_user_company_id(auth.uid()));
+CREATE POLICY "Managers and admins can manage materials" ON public.materials FOR ALL USING (company_id = get_user_company_id(auth.uid()) AND get_user_role(auth.uid()) IN ('admin', 'manager'));
 
-CREATE POLICY "Users can view company members" ON public.profiles
-    FOR SELECT USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+-- Project Material RLS Policies
+CREATE POLICY "Users can manage materials on projects in their company" ON public.project_materials FOR ALL USING (project_id IN (SELECT id FROM public.projects WHERE company_id = get_user_company_id(auth.uid())));
 
-CREATE POLICY "Admins can manage company users" ON public.profiles
-    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
-
--- Project policies
-CREATE POLICY "Users can view company projects" ON projects
-    FOR SELECT USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
-
-CREATE POLICY "Managers and admins can manage projects" ON projects
-    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')));
-
--- Task policies
-CREATE POLICY "Users can view company tasks" ON tasks
-    FOR SELECT USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid())));
-
-CREATE POLICY "Users can update assigned tasks" ON tasks
-    FOR UPDATE USING (assigned_to = auth.uid());
-
-CREATE POLICY "Managers and admins can manage tasks" ON tasks
-    FOR ALL USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
-
--- Time entry policies
-CREATE POLICY "Users can only manage their own time entries" ON time_entries
-    FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Managers and admins can view all time entries" ON time_entries
-    FOR SELECT USING (user_id IN (SELECT id FROM public.profiles WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager'))));
-
--- Material policies
-CREATE POLICY "Users can view company materials" ON materials
-    FOR SELECT USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
-
-CREATE POLICY "Managers and admins can manage materials" ON materials
-    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'manager')));
-
--- Project material policies
-CREATE POLICY "Users can manage materials on their projects" ON project_materials
-    FOR ALL USING (project_id IN (SELECT id FROM projects WHERE company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid())));
-
--- Employee invitation policies
-CREATE POLICY "Admins can manage invitations for their company" ON employee_invitations
-    FOR ALL USING (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+-- Employee Invitation RLS Policies
+CREATE POLICY "Admins can manage invitations for their company" ON public.employee_invitations FOR ALL USING (company_id = get_user_company_id(auth.uid()) AND get_user_role(auth.uid()) = 'admin');
 
 -- Insert sample data for testing
-INSERT INTO companies (name, address, phone, email) VALUES 
+INSERT INTO public.companies (name, address, phone, email) VALUES 
 ('Muster Handwerksbetrieb GmbH', 'Musterstraße 123, 12345 Musterstadt', '+49 123 456789', 'info@muster-handwerk.de');
 
 -- Note: Sample users will be created through the registration process 
