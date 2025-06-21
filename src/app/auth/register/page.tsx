@@ -40,8 +40,8 @@ export default function RegisterPage() {
           company_name: companyName,
           company_phone: companyPhone
         },
-        // The verification email will be sent to this URL
-        emailRedirectTo: `${location.origin}/auth/verify`,
+        // The verification email will be sent to THIS URL
+        emailRedirectTo: `${location.origin}/api/auth/callback`,
       },
     })
 
