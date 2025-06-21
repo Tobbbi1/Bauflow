@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
-import { supabase } from '@/lib/supabase' // Correctly import the supabase instance
 import Link from 'next/link'
 
 export default function VerifyPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const handleVerification = async () => {
@@ -32,13 +33,21 @@ export default function VerifyPage() {
           setStatus('error')
         }
       } else {
+        // This case is unlikely with the PKCE flow but good to have.
+        // It could also happen if the user navigates to this page manually.
         setError('Kein gültiger Bestätigungscode in der URL gefunden.')
         setStatus('error')
       }
     }
 
-    handleVerification()
-  }, [router])
+    // A small delay to ensure the URL is fully parsed on the client
+    const timer = setTimeout(() => {
+      handleVerification()
+    }, 100);
+
+    return () => clearTimeout(timer);
+
+  }, [router, supabase])
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4 text-center">
