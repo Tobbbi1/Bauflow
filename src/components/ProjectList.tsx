@@ -15,9 +15,14 @@ interface Baustelle {
   created_at: string
 }
 
+interface Profile {
+    company_id: string;
+}
+
 export default function BaustellenList() {
   const [baustellen, setBaustellen] = useState<Baustelle[]>([])
   const [isFormVisible, setIsFormVisible] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [newBaustelle, setNewBaustelle] = useState({
       name: '',
       address: '',
@@ -31,22 +36,40 @@ export default function BaustellenList() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const fetchBaustellen = async () => {
+    const fetchInitialData = async () => {
       setLoading(true)
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) {
+            setError('Fehler beim Laden der Benutzerdaten: ' + profileError.message);
+            setLoading(false);
+            return;
+        } 
+        
+        setProfile(profileData);
+        
+        const { data: baustellenData, error: baustellenError } = await supabase
           .from('projects')
           .select('id, name, address, status, contact_person_name, start_date, end_date, created_at')
           .order('created_at', { ascending: false })
 
-        if (error) {
-          setError(error.message)
+        if (baustellenError) {
+          setError(baustellenError.message)
         } else {
-          setBaustellen(data as Baustelle[])
+          setBaustellen(baustellenData as Baustelle[])
         }
+      }
       setLoading(false)
     }
 
-    fetchBaustellen()
+    fetchInitialData()
   }, [supabase])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -56,6 +79,10 @@ export default function BaustellenList() {
 
   const handleAddBaustelle = async (e: FormEvent) => {
     e.preventDefault()
+    if (!profile) {
+        setError("Benutzerprofil nicht geladen. Bitte laden Sie die Seite neu.");
+        return;
+    }
     setError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -66,6 +93,7 @@ export default function BaustellenList() {
         .insert({
           ...newBaustelle,
           created_by: user.id,
+          company_id: profile.company_id
         })
         .select()
         .single()
@@ -104,50 +132,37 @@ export default function BaustellenList() {
       {isFormVisible && (
         <form onSubmit={handleAddBaustelle} className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-fade-in-down">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                {/* Name */}
                 <div className="md:col-span-2">
                     <label htmlFor="name" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><FileText size={16}/>Baustellen-Name</label>
                     <input id="name" name="name" type="text" value={newBaustelle.name} onChange={handleInputChange} className="input-field" placeholder="z.B. Neubau EFH Meier" required />
                 </div>
-
-                {/* Address */}
                 <div>
                     <label htmlFor="address" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><MapPin size={16}/>Adresse</label>
                     <input id="address" name="address" type="text" value={newBaustelle.address} onChange={handleInputChange} className="input-field" placeholder="z.B. Hauptstraße 1, 12345 Berlin" required/>
                 </div>
-
-                {/* Contact Person */}
                 <div>
                     <label htmlFor="contact_person_name" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><User size={16}/>Ansprechpartner</label>
                     <input id="contact_person_name" name="contact_person_name" type="text" value={newBaustelle.contact_person_name} onChange={handleInputChange} className="input-field" placeholder="z.B. Herr Schmidt" required/>
                 </div>
-
-                 {/* Description */}
                 <div className="md:col-span-2">
                     <label htmlFor="description" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><FileText size={16}/>Was muss gemacht werden?</label>
-                    <textarea id="description" name="description" value={newBaustelle.description} onChange={handleInputChange} className="input-field" rows={3} placeholder="z.B. Komplette Badsanierung inkl. Fliesen"></textarea>
+                    <textarea id="description" name="description" value={(newBaustelle.description || '')} onChange={handleInputChange} className="input-field" rows={3} placeholder="z.B. Komplette Badsanierung inkl. Fliesen"></textarea>
                 </div>
-
-                {/* Start Date */}
                 <div>
                     <label htmlFor="start_date" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><Calendar size={16}/>Start-Datum</label>
                     <input id="start_date" name="start_date" type="date" value={newBaustelle.start_date} onChange={handleInputChange} className="input-field" required/>
                 </div>
-
-                {/* End Date */}
                 <div>
                     <label htmlFor="end_date" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><Calendar size={16}/>End-Datum</label>
                     <input id="end_date" name="end_date" type="date" value={newBaustelle.end_date} onChange={handleInputChange} className="input-field" required/>
                 </div>
             </div>
-
             <div className="mt-6">
                 <button type="submit" className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                   <PlusCircle className="w-5 h-5" />
                   <span>Baustelle anlegen</span>
                 </button>
             </div>
-
             {error && (
                 <div className="mt-4 bg-red-50 p-3 rounded-md flex items-center gap-2 text-sm text-red-600">
                     <AlertCircle className="h-5 w-5"/>
@@ -175,7 +190,7 @@ export default function BaustellenList() {
                   <div className="text-sm text-slate-500">{b.address}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                  {new Date(b.start_date).toLocaleDateString()} - {new Date(b.end_date).toLocaleDateString()}
+                  {b.start_date && new Date(b.start_date).toLocaleDateString()} - {b.end_date && new Date(b.end_date).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -195,12 +210,16 @@ export default function BaustellenList() {
           </tbody>
         </table>
       </div>
-       <style jsx>{`
+      <style jsx>{`
         .input-field {
             appearance: none; display: block; width: 100%;
             padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1;
             border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
             background-color: white;
+            color: #0f172a;
+        }
+        .input-field::placeholder {
+            color: #94a3b8;
         }
         .input-field:focus {
             outline: none; --tw-ring-color: #3b82f6; border-color: #3b82f6;
