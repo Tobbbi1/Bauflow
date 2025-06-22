@@ -100,10 +100,19 @@ export default function BaustellenList() {
 
       // Try using server-side API instead of direct client insertion
       try {
+        // Get the current session to extract the access token
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session?.access_token) {
+          setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+          return;
+        }
+
         const response = await fetch('/api/projects/create', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
             ...newBaustelle,
