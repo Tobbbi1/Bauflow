@@ -1,35 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
-    // Use service role client that bypasses RLS
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = await createClient()
     
-    // Get the authenticated user from the request headers
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Keine Authentifizierung' },
-        { status: 401 }
-      )
-    }
-
-    // Extract user from JWT token
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Ungültige Authentifizierung' },
+        { error: 'Nicht authentifiziert' },
         { status: 401 }
       )
     }
 
-    // Get user profile
+    // Get user profile to verify company_id
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('company_id')
@@ -45,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     
-    // Create the project with service role (bypasses RLS)
+    // Create the project with server-side context (RLS still applies but works correctly)
     const { data, error } = await supabase
       .from('projects')
       .insert({
