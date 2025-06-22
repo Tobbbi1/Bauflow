@@ -88,6 +88,16 @@ export default function BaustellenList() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (user) {
+      // Debug logging
+      console.log('Debug - Profile data:', profile);
+      console.log('Debug - User ID:', user.id);
+      console.log('Debug - Company ID:', profile.company_id);
+      console.log('Debug - Project data to insert:', {
+        ...newBaustelle,
+        created_by: user.id,
+        company_id: profile.company_id
+      });
+
       const { data, error } = await supabase
         .from('projects')
         .insert({
@@ -99,6 +109,7 @@ export default function BaustellenList() {
         .single()
 
       if (error) {
+        console.error('Debug - Insert error:', error);
         setError(error.message)
       } else if (data) {
         setBaustellen([data as Baustelle, ...baustellen])
