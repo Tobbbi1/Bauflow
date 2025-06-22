@@ -2,61 +2,69 @@
 
 import { useState, useEffect, FormEvent } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { PlusCircle, Loader2, AlertCircle, Trash2, Edit } from 'lucide-react'
+import { PlusCircle, Loader2, AlertCircle, Trash2, Edit, HardHat, User, MapPin, Calendar, FileText } from 'lucide-react'
 
-interface Project {
+interface Baustelle {
   id: string
   name: string
   address: string
   status: string
+  contact_person_name: string
+  start_date: string
+  end_date: string
   created_at: string
 }
 
-export default function ProjectList() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [newProjectName, setNewProjectName] = useState('')
-  const [newProjectAddress, setNewProjectAddress] = useState('')
+export default function BaustellenList() {
+  const [baustellen, setBaustellen] = useState<Baustelle[]>([])
+  const [newBaustelle, setNewBaustelle] = useState({
+      name: '',
+      address: '',
+      description: '',
+      contact_person_name: '',
+      start_date: '',
+      end_date: '',
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchBaustellen = async () => {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user) {
-        const { data, error } = await supabase
+      const { data, error } = await supabase
           .from('projects')
-          .select('id, name, address, status, created_at')
+          .select('id, name, address, status, contact_person_name, start_date, end_date, created_at')
           .order('created_at', { ascending: false })
 
         if (error) {
           setError(error.message)
         } else {
-          setProjects(data)
+          setBaustellen(data as Baustelle[])
         }
-      }
       setLoading(false)
     }
 
-    fetchProjects()
+    fetchBaustellen()
   }, [supabase])
 
-  const handleAddProject = async (e: FormEvent) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const { name, value } = e.target;
+      setNewBaustelle(prev => ({ ...prev, [name]: value }));
+  }
+
+  const handleAddBaustelle = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (user && newProjectName && newProjectAddress) {
+    if (user) {
       const { data, error } = await supabase
         .from('projects')
         .insert({
-          name: newProjectName,
-          address: newProjectAddress,
+          ...newBaustelle,
           created_by: user.id,
-          // company_id is set by a trigger/default in the database
         })
         .select()
         .single()
@@ -64,9 +72,8 @@ export default function ProjectList() {
       if (error) {
         setError(error.message)
       } else if (data) {
-        setProjects([data, ...projects])
-        setNewProjectName('')
-        setNewProjectAddress('')
+        setBaustellen([data as Baustelle, ...baustellen])
+        setNewBaustelle({ name: '', address: '', description: '', contact_person_name: '', start_date: '', end_date: '' });
       }
     }
   }
@@ -81,44 +88,54 @@ export default function ProjectList() {
 
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-      <h2 className="text-2xl font-bold text-slate-800 mb-6">Projekte verwalten</h2>
+      <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><HardHat /> Baustellen verwalten</h2>
       
-      <form onSubmit={handleAddProject} className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-          <div>
-            <label htmlFor="projectName" className="block text-sm font-medium text-slate-700 mb-1">Projektname</label>
-            <input
-              id="projectName"
-              type="text"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="z.B. Neubau EFH Meier"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="projectAddress" className="block text-sm font-medium text-slate-700 mb-1">Adresse</label>
-            <input
-              id="projectAddress"
-              type="text"
-              value={newProjectAddress}
-              onChange={(e) => setNewProjectAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="z.B. Hauptstraße 1, 12345 Berlin"
-              required
-            />
-          </div>
-          <div className="md:col-span-2">
-            <button
-              type="submit"
-              className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <PlusCircle className="w-5 h-5" />
-              <span>Projekt hinzufügen</span>
-            </button>
-          </div>
+      <form onSubmit={handleAddBaustelle} className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            {/* Name */}
+            <div className="md:col-span-2">
+                <label htmlFor="name" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><FileText size={16}/>Baustellen-Name</label>
+                <input id="name" name="name" type="text" value={newBaustelle.name} onChange={handleInputChange} className="input-field" placeholder="z.B. Neubau EFH Meier" required />
+            </div>
+
+            {/* Address */}
+            <div>
+                <label htmlFor="address" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><MapPin size={16}/>Adresse</label>
+                <input id="address" name="address" type="text" value={newBaustelle.address} onChange={handleInputChange} className="input-field" placeholder="z.B. Hauptstraße 1, 12345 Berlin" required/>
+            </div>
+
+            {/* Contact Person */}
+            <div>
+                <label htmlFor="contact_person_name" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><User size={16}/>Ansprechpartner</label>
+                <input id="contact_person_name" name="contact_person_name" type="text" value={newBaustelle.contact_person_name} onChange={handleInputChange} className="input-field" placeholder="z.B. Herr Schmidt" required/>
+            </div>
+
+             {/* Description */}
+            <div className="md:col-span-2">
+                <label htmlFor="description" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><FileText size={16}/>Was muss gemacht werden?</label>
+                <textarea id="description" name="description" value={newBaustelle.description} onChange={handleInputChange} className="input-field" rows={3} placeholder="z.B. Komplette Badsanierung inkl. Fliesen"></textarea>
+            </div>
+
+            {/* Start Date */}
+            <div>
+                <label htmlFor="start_date" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><Calendar size={16}/>Start-Datum</label>
+                <input id="start_date" name="start_date" type="date" value={newBaustelle.start_date} onChange={handleInputChange} className="input-field" required/>
+            </div>
+
+            {/* End Date */}
+            <div>
+                <label htmlFor="end_date" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><Calendar size={16}/>End-Datum</label>
+                <input id="end_date" name="end_date" type="date" value={newBaustelle.end_date} onChange={handleInputChange} className="input-field" required/>
+            </div>
         </div>
+
+        <div className="mt-6">
+            <button type="submit" className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+              <PlusCircle className="w-5 h-5" />
+              <span>Baustelle anlegen</span>
+            </button>
+        </div>
+
         {error && (
             <div className="mt-4 bg-red-50 p-3 rounded-md flex items-center gap-2 text-sm text-red-600">
                 <AlertCircle className="h-5 w-5"/>
@@ -131,32 +148,30 @@ export default function ProjectList() {
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Projektname</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Baustelle</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Zeitraum</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Erstellt am</th>
-              <th scope="col" className="relative px-6 py-3">
-                <span className="sr-only">Aktionen</span>
-              </th>
+              <th scope="col" className="relative px-6 py-3"><span className="sr-only">Aktionen</span></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
-            {projects.map((project) => (
-              <tr key={project.id}>
+            {baustellen.map((b) => (
+              <tr key={b.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-slate-900">{project.name}</div>
-                  <div className="text-sm text-slate-500">{project.address}</div>
+                  <div className="text-sm font-medium text-slate-900">{b.name}</div>
+                  <div className="text-sm text-slate-500">{b.address}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                  {new Date(b.start_date).toLocaleDateString()} - {new Date(b.end_date).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      project.status === 'active' ? 'bg-green-100 text-green-800' :
-                      project.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
+                      b.status === 'active' ? 'bg-green-100 text-green-800' :
+                      b.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-slate-100 text-slate-800'
                   }`}>
-                    {project.status}
+                    {b.status}
                   </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                  {new Date(project.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button className="text-blue-600 hover:text-blue-900 mr-4"><Edit className="w-4 h-4"/></button>
@@ -167,6 +182,18 @@ export default function ProjectList() {
           </tbody>
         </table>
       </div>
+       <style jsx>{`
+        .input-field {
+            appearance: none; display: block; width: 100%;
+            padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1;
+            border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            background-color: white;
+        }
+        .input-field:focus {
+            outline: none; --tw-ring-color: #3b82f6; border-color: #3b82f6;
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+    `}</style>
     </div>
   )
 } 

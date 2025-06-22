@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
-import ProjectList from '@/components/ProjectList'
+import BaustellenList from '@/components/ProjectList'
 import {
   LayoutDashboard,
-  FolderKanban,
+  HardHat,
   Calendar,
   CheckSquare,
   Users,
@@ -77,7 +77,7 @@ export default function AppPage() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'projects', label: 'Projekte', icon: FolderKanban },
+    { id: 'baustellen', label: 'Baustellen', icon: HardHat },
     { id: 'calendar', label: 'Kalender', icon: Calendar },
     { id: 'tasks', label: 'Aufgaben', icon: CheckSquare },
     { id: 'employees', label: 'Mitarbeiter', icon: Users },
@@ -88,8 +88,8 @@ export default function AppPage() {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardContent profile={profile} />
-      case 'projects':
-        return <ProjectList />
+      case 'baustellen':
+        return <BaustellenList />
       case 'settings':
         return <SettingsContent />
       default:
@@ -215,6 +215,11 @@ export default function AppPage() {
 function DashboardContent({ profile }: { profile: Profile | null }) {
     const [activeProjects, setActiveProjects] = useState<{id: string, name: string, address: string}[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
+    const openTasks = [
+        { id: 1, title: 'Fliesen im Bad legen', priority: 'high'},
+        { id: 2, title: 'Material für Dachstuhl bestellen', priority: 'high'},
+        { id: 3, title: 'Angebot für Fenster prüfen', priority: 'low'},
+    ]
     const supabase = createClientComponentClient();
 
     useEffect(() => {
@@ -224,7 +229,7 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
                 .from('projects')
                 .select('id, name, address')
                 .eq('status', 'active') // 'active' ist der Status für "im Vollzug"
-                .limit(5);
+                .limit(3);
 
             if (!error) {
                 setActiveProjects(data);
@@ -235,8 +240,7 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
     }, [supabase]);
     
     const quickActions = [
-        { label: 'Neues Projekt', icon: Briefcase, action: () => console.log("Neues Projekt") },
-        { label: 'Neuer Mitarbeiter', icon: User, action: () => console.log("Neuer Mitarbeiter") },
+        { label: 'Neue Baustelle', icon: Briefcase, action: () => console.log("Neue Baustelle") },
         { label: 'Stundenzettel', icon: Clock, action: () => console.log("Stundenzettel") },
         { label: 'Neue Aufgabe', icon: Wrench, action: () => console.log("Neue Aufgabe") }
     ];
@@ -252,7 +256,7 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
 
        <div className="mb-8">
         <h2 className="text-xl font-semibold text-slate-800 mb-4">Was möchten Sie heute tun?</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {quickActions.map(item => (
                 <button key={item.label} onClick={item.action} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:bg-slate-100 transition-colors flex flex-col items-center justify-center text-center">
                     <item.icon className="w-8 h-8 text-blue-600 mb-2" />
@@ -262,34 +266,26 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Aktive Projekte</p>
-              <p className="text-3xl font-bold text-slate-900">3</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FolderKanban className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Offene Aufgaben</p>
-              <p className="text-3xl font-bold text-slate-900">12</p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <CheckSquare className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
+          <h2 className="text-xl font-semibold text-slate-800 mb-4">Offene Aufgaben</h2>
+           <ul className="space-y-3">
+                {openTasks.map(task => (
+                    <li key={task.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <span className="font-medium text-slate-800">{task.title}</span>
+                         <span className={`text-sm font-semibold px-2 py-1 rounded-full ${task.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                            {task.priority === 'high' ? 'Dringend' : 'Normal'}
+                        </span>
+                    </li>
+                ))}
+            </ul>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-600">Nächster Termin</p>
-              <p className="text-3xl font-bold text-slate-900">Morgen</p>
+              <p className="text-2xl font-bold text-slate-900">Baubesprechung Meier</p>
+              <p className="text-sm text-slate-500">Morgen, 10:00 Uhr</p>
             </div>
             <div className="p-3 bg-purple-100 rounded-lg">
               <Calendar className="w-6 h-6 text-purple-600" />

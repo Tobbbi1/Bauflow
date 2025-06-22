@@ -90,19 +90,18 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
--- Projects table
+-- Projects table (now represents "Baustellen")
 CREATE TABLE public.projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
-    description TEXT,
-    client_name VARCHAR(255),
-    client_email VARCHAR(255),
-    client_phone VARCHAR(50),
     address TEXT,
+    description TEXT,
+    contact_person_name VARCHAR(255),
+    contact_person_phone VARCHAR(50),
     start_date DATE,
     end_date DATE,
-    status VARCHAR(50) DEFAULT 'planning',
-    budget DECIMAL(10,2),
+    status VARCHAR(50) DEFAULT 'planning', -- e.g., planning, active, completed, on_hold
+    budget DECIMAL(12,2),
     company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
     created_by UUID REFERENCES public.profiles(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
