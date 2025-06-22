@@ -213,6 +213,27 @@ export default function AppPage() {
 }
 
 function DashboardContent({ profile }: { profile: Profile | null }) {
+    const [activeProjects, setActiveProjects] = useState<{id: string, name: string, address: string}[]>([]);
+    const [loadingProjects, setLoadingProjects] = useState(true);
+    const supabase = createClientComponentClient();
+
+    useEffect(() => {
+        const fetchActiveProjects = async () => {
+            setLoadingProjects(true);
+            const { data, error } = await supabase
+                .from('projects')
+                .select('id, name, address')
+                .eq('status', 'active') // 'active' ist der Status für "im Vollzug"
+                .limit(5);
+
+            if (!error) {
+                setActiveProjects(data);
+            }
+            setLoadingProjects(false);
+        };
+        fetchActiveProjects();
+    }, [supabase]);
+    
     const quickActions = [
         { label: 'Neues Projekt', icon: Briefcase, action: () => console.log("Neues Projekt") },
         { label: 'Neuer Mitarbeiter', icon: User, action: () => console.log("Neuer Mitarbeiter") },
@@ -241,7 +262,7 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
@@ -267,17 +288,6 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600">Mitarbeiter online</p>
-              <p className="text-3xl font-bold text-slate-900">1 / 5</p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Users className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
               <p className="text-sm text-slate-600">Nächster Termin</p>
               <p className="text-3xl font-bold text-slate-900">Morgen</p>
             </div>
@@ -289,28 +299,26 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
       </div>
 
        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-         <h2 className="text-xl font-semibold text-slate-800 mb-4">Projekt-Fortschritt</h2>
-         {/* Placeholder for project progress bars */}
-         <div className="space-y-4">
-            <div>
-                <div className="flex justify-between mb-1">
-                    <span className="text-base font-medium text-slate-700">Neubau EFH Meier</span>
-                    <span className="text-sm font-medium text-slate-700">75%</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2.5">
-                    <div className="bg-blue-600 h-2.5 rounded-full" style={{width: "75%"}}></div>
-                </div>
+         <h2 className="text-xl font-semibold text-slate-800 mb-4">Aktive Baustellen</h2>
+         {loadingProjects ? (
+            <div className="flex justify-center items-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
             </div>
-             <div>
-                <div className="flex justify-between mb-1">
-                    <span className="text-base font-medium text-slate-700">Sanierung Bad Schmidt</span>
-                    <span className="text-sm font-medium text-slate-700">30%</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2.5">
-                    <div className="bg-orange-500 h-2.5 rounded-full" style={{width: "30%"}}></div>
-                </div>
-            </div>
-         </div>
+         ) : activeProjects.length > 0 ? (
+            <ul className="space-y-3">
+                {activeProjects.map(project => (
+                    <li key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                        <div>
+                            <p className="font-medium text-slate-800">{project.name}</p>
+                            <p className="text-sm text-slate-500">{project.address}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">Aktiv</span>
+                    </li>
+                ))}
+            </ul>
+         ) : (
+            <p className="text-center py-4 text-slate-500">Derzeit sind keine Baustellen im Vollzug.</p>
+         )}
        </div>
     </div>
   )
