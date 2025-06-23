@@ -1,5 +1,5 @@
--- Bauflow Database Schema
--- Erweiterte Version mit Authentifizierung und Firmenverwaltung
+-- Bauflow Database Schema - Erweiterte Version
+-- Mit Farben für Baustellen und Aufgaben, erweiterte Aufgabenverwaltung
 
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -22,8 +22,6 @@ CREATE TABLE public.companies (
 CREATE TYPE user_role AS ENUM ('admin', 'manager', 'employee');
 
 -- USER MANAGEMENT (Supabase Auth Integration)
--- This section is now designed to work with Supabase's built-in authentication.
-
 -- Drop dependent objects first
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
@@ -32,21 +30,13 @@ DROP FUNCTION IF EXISTS public.handle_new_user();
 DROP TABLE IF EXISTS public.users CASCADE;
 
 -- Create a `profiles` table to store public user data.
--- This table extends Supabase's internal `auth.users` table.
 CREATE TABLE public.profiles (
-  -- The `id` column matches the `id` of the user in `auth.users`.
-  -- It acts as our primary key and a foreign key.
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  
   company_id UUID REFERENCES public.companies(id) ON DELETE SET NULL,
   first_name VARCHAR(100),
   last_name VARCHAR(100),
   phone VARCHAR(50),
-  
-  -- The user's role within the application.
   role user_role NOT NULL,
-  
-  -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -54,9 +44,7 @@ CREATE TABLE public.profiles (
 COMMENT ON TABLE public.profiles IS 'Stores public profile information for each user, linked to the Supabase auth system.';
 COMMENT ON COLUMN public.profiles.id IS 'Links to auth.users.id. Primary key.';
 
-
 -- Supabase Trigger Function: handle_new_user
--- This function automatically creates a new profile when a user signs up.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -66,17 +54,15 @@ DECLARE
   company_id_from_meta UUID;
   user_role_from_meta user_role;
 BEGIN
-  -- Extract metadata passed during sign-up
   company_id_from_meta := (new.raw_user_meta_data->>'companyId')::UUID;
   user_role_from_meta := (new.raw_user_meta_data->>'role')::user_role;
 
-  -- Create a profile entry for the new user
   INSERT INTO public.profiles (id, first_name, last_name, role, company_id)
   VALUES (
     new.id,
     new.raw_user_meta_data->>'firstName',
     new.raw_user_meta_data->>'lastName',
-    COALESCE(user_role_from_meta, 'employee'), -- Default to 'employee' if not provided
+    COALESCE(user_role_from_meta, 'employee'),
     company_id_from_meta
   );
   RETURN new;
@@ -84,13 +70,12 @@ END;
 $$;
 
 -- Supabase Trigger: on_auth_user_created
--- This trigger calls the function whenever a new user is inserted into `auth.users`.
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
--- Projects table (now represents "Baustellen")
+-- Projects table (Baustellen) - ERWEITERT mit Farben
 CREATE TABLE public.projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -100,7 +85,7 @@ CREATE TABLE public.projects (
     contact_person_phone VARCHAR(50),
     start_date DATE,
     end_date DATE,
-    status VARCHAR(50) DEFAULT 'planning', -- e.g., planning, active, completed, on_hold
+    status VARCHAR(50) DEFAULT 'planning',
     budget DECIMAL(12,2),
     color VARCHAR(7) DEFAULT '#3B82F6', -- Hex color code for project color
     company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
@@ -109,7 +94,7 @@ CREATE TABLE public.projects (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tasks table (erweitert für Aufgabenverwaltung)
+-- Tasks table - ERWEITERT für Aufgabenverwaltung
 CREATE TABLE public.tasks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
@@ -219,9 +204,6 @@ CREATE TRIGGER update_time_entries_updated_at BEFORE UPDATE ON public.time_entri
 CREATE TRIGGER update_materials_updated_at BEFORE UPDATE ON public.materials FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Helper Functions to prevent RLS recursion
--- These functions are SECURITY DEFINER, which means they bypass RLS checks
--- and can safely query user data without causing an infinite loop.
-
 CREATE OR REPLACE FUNCTION get_user_company_id(user_id UUID)
 RETURNS UUID
 LANGUAGE plpgsql
@@ -287,7 +269,6 @@ DROP POLICY IF EXISTS "Users can view company materials" ON public.materials;
 DROP POLICY IF EXISTS "Managers and admins can manage materials" ON public.materials;
 DROP POLICY IF EXISTS "Users can manage materials on their projects" ON public.project_materials;
 DROP POLICY IF EXISTS "Admins can manage invitations for their company" ON public.employee_invitations;
-
 
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

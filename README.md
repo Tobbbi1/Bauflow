@@ -51,8 +51,8 @@ Bauflow ist eine moderne, browserbasierte Projektmanagement-Software speziell en
    - Das Schema erstellt alle notwendigen Tabellen, Indizes und RLS-Policies
 
 5. **Entwicklungsserver starten**
-   ```bash
-   npm run dev
+```bash
+npm run dev
    ```
 
 ## 🗄️ Datenbankstruktur

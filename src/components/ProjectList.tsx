@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { PlusCircle, Loader2, AlertCircle, Trash2, Edit, HardHat, User, MapPin, Calendar, FileText, ChevronUp } from 'lucide-react'
+import { PlusCircle, Loader2, AlertCircle, Trash2, Edit, HardHat, User, MapPin, Calendar, FileText, ChevronUp, Palette } from 'lucide-react'
 
 interface Baustelle {
   id: string
@@ -12,6 +12,7 @@ interface Baustelle {
   contact_person_name: string
   start_date: string
   end_date: string
+  color: string
   created_at: string
 }
 
@@ -22,6 +23,8 @@ interface Profile {
 export default function BaustellenList() {
   const [baustellen, setBaustellen] = useState<Baustelle[]>([])
   const [isFormVisible, setIsFormVisible] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingBaustelle, setEditingBaustelle] = useState<Baustelle | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null);
   const [newBaustelle, setNewBaustelle] = useState({
       name: '',
@@ -30,10 +33,17 @@ export default function BaustellenList() {
       contact_person_name: '',
       start_date: '',
       end_date: '',
+      color: '#3B82F6'
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClientComponentClient()
+
+  // Vordefinierte Farben für Baustellen
+  const colorOptions = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', 
+    '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+  ]
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -57,7 +67,7 @@ export default function BaustellenList() {
         
         const { data: baustellenData, error: baustellenError } = await supabase
           .from('projects')
-          .select('id, name, address, status, contact_person_name, start_date, end_date, created_at')
+          .select('id, name, address, status, contact_person_name, start_date, end_date, color, created_at')
           .order('created_at', { ascending: false })
 
         if (baustellenError) {
@@ -74,7 +84,19 @@ export default function BaustellenList() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
-      setNewBaustelle(prev => ({ ...prev, [name]: value }));
+      if (isEditMode && editingBaustelle) {
+        setEditingBaustelle(prev => prev ? { ...prev, [name]: value } : null)
+      } else {
+        setNewBaustelle(prev => ({ ...prev, [name]: value }));
+      }
+  }
+
+  const handleColorChange = (color: string) => {
+    if (isEditMode && editingBaustelle) {
+      setEditingBaustelle(prev => prev ? { ...prev, color } : null)
+    } else {
+      setNewBaustelle(prev => ({ ...prev, color }))
+    }
   }
 
   const handleAddBaustelle = async (e: FormEvent) => {
@@ -88,19 +110,7 @@ export default function BaustellenList() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (user) {
-      // Debug logging
-      console.log('Debug - Profile data:', profile);
-      console.log('Debug - User ID:', user.id);
-      console.log('Debug - Company ID:', profile.company_id);
-      console.log('Debug - Project data to insert:', {
-        ...newBaustelle,
-        created_by: user.id,
-        company_id: profile.company_id
-      });
-
-      // Try using server-side API instead of direct client insertion
       try {
-        // Access Token holen
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
           setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
@@ -123,12 +133,98 @@ export default function BaustellenList() {
           return;
         }
         setBaustellen([result.data, ...baustellen])
-        setNewBaustelle({ name: '', address: '', description: '', contact_person_name: '', start_date: '', end_date: '' });
+        setNewBaustelle({ name: '', address: '', description: '', contact_person_name: '', start_date: '', end_date: '', color: '#3B82F6' });
         setIsFormVisible(false)
       } catch (apiError) {
         setError('Netzwerkfehler beim Speichern der Baustelle');
       }
     }
+  }
+
+  const handleEditBaustelle = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!editingBaustelle) return
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+        return;
+      }
+
+      const response = await fetch('/api/projects/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(editingBaustelle),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error || 'Fehler beim Aktualisieren der Baustelle');
+        return;
+      }
+
+      // Baustelle in der Liste aktualisieren
+      setBaustellen(prev => prev.map(baustelle => 
+        baustelle.id === editingBaustelle.id 
+          ? { ...baustelle, ...editingBaustelle }
+          : baustelle
+      ))
+
+      setEditingBaustelle(null)
+      setIsEditMode(false)
+      setIsFormVisible(false)
+    } catch (apiError) {
+      setError('Netzwerkfehler beim Aktualisieren der Baustelle');
+    }
+  }
+
+  const handleDeleteBaustelle = async (baustelleId: string) => {
+    if (!confirm('Sind Sie sicher, dass Sie diese Baustelle löschen möchten? Alle zugehörigen Aufgaben werden ebenfalls gelöscht.')) {
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+        return;
+      }
+
+      const response = await fetch(`/api/projects/delete?id=${baustelleId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        setError(result.error || 'Fehler beim Löschen der Baustelle');
+        return;
+      }
+
+      // Baustelle aus der Liste entfernen
+      setBaustellen(prev => prev.filter(baustelle => baustelle.id !== baustelleId))
+    } catch (apiError) {
+      setError('Netzwerkfehler beim Löschen der Baustelle');
+    }
+  }
+
+  const startEditBaustelle = (baustelle: Baustelle) => {
+    setEditingBaustelle(baustelle)
+    setIsEditMode(true)
+    setIsFormVisible(true)
+  }
+
+  const cancelEdit = () => {
+    setEditingBaustelle(null)
+    setIsEditMode(false)
+    setIsFormVisible(false)
+    setNewBaustelle({ name: '', address: '', description: '', contact_person_name: '', start_date: '', end_date: '', color: '#3B82F6' })
   }
 
   if (loading) {
@@ -144,7 +240,13 @@ export default function BaustellenList() {
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><HardHat /> Baustellen verwalten</h2>
             <button
-                onClick={() => setIsFormVisible(!isFormVisible)}
+                onClick={() => {
+                  if (isEditMode) {
+                    cancelEdit()
+                  } else {
+                    setIsFormVisible(!isFormVisible)
+                  }
+                }}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
             >
                 {isFormVisible ? <ChevronUp className="w-5 h-5" /> : <PlusCircle className="w-5 h-5" />}
@@ -153,38 +255,74 @@ export default function BaustellenList() {
         </div>
       
       {isFormVisible && (
-        <form onSubmit={handleAddBaustelle} className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-fade-in-down">
+        <form onSubmit={isEditMode ? handleEditBaustelle : handleAddBaustelle} className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-fade-in-down">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <div className="md:col-span-2">
                     <label htmlFor="name" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><FileText size={16}/>Baustellen-Name</label>
-                    <input id="name" name="name" type="text" value={newBaustelle.name} onChange={handleInputChange} className="input-field" placeholder="z.B. Neubau EFH Meier" required />
+                    <input id="name" name="name" type="text" value={isEditMode && editingBaustelle ? editingBaustelle.name : newBaustelle.name} onChange={handleInputChange} className="input-field" placeholder="z.B. Neubau EFH Meier" required />
                 </div>
                 <div>
                     <label htmlFor="address" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><MapPin size={16}/>Adresse</label>
-                    <input id="address" name="address" type="text" value={newBaustelle.address} onChange={handleInputChange} className="input-field" placeholder="z.B. Hauptstraße 1, 12345 Berlin" required/>
+                    <input id="address" name="address" type="text" value={isEditMode && editingBaustelle ? editingBaustelle.address : newBaustelle.address} onChange={handleInputChange} className="input-field" placeholder="z.B. Hauptstraße 1, 12345 Berlin" required/>
                 </div>
                 <div>
                     <label htmlFor="contact_person_name" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><User size={16}/>Ansprechpartner</label>
-                    <input id="contact_person_name" name="contact_person_name" type="text" value={newBaustelle.contact_person_name} onChange={handleInputChange} className="input-field" placeholder="z.B. Herr Schmidt" required/>
+                    <input id="contact_person_name" name="contact_person_name" type="text" value={isEditMode && editingBaustelle ? editingBaustelle.contact_person_name : newBaustelle.contact_person_name} onChange={handleInputChange} className="input-field" placeholder="z.B. Herr Schmidt" required/>
                 </div>
                 <div className="md:col-span-2">
                     <label htmlFor="description" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><FileText size={16}/>Was muss gemacht werden?</label>
-                    <textarea id="description" name="description" value={(newBaustelle.description || '')} onChange={handleInputChange} className="input-field" rows={3} placeholder="z.B. Komplette Badsanierung inkl. Fliesen"></textarea>
+                    <textarea id="description" name="description" value={(isEditMode && editingBaustelle ? editingBaustelle.description : newBaustelle.description) || ''} onChange={handleInputChange} className="input-field" rows={3} placeholder="z.B. Komplette Badsanierung inkl. Fliesen"></textarea>
                 </div>
                 <div>
                     <label htmlFor="start_date" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><Calendar size={16}/>Start-Datum</label>
-                    <input id="start_date" name="start_date" type="date" value={newBaustelle.start_date} onChange={handleInputChange} className="input-field" required/>
+                    <input id="start_date" name="start_date" type="date" value={isEditMode && editingBaustelle ? editingBaustelle.start_date : newBaustelle.start_date} onChange={handleInputChange} className="input-field" required/>
                 </div>
                 <div>
                     <label htmlFor="end_date" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1"><Calendar size={16}/>End-Datum</label>
-                    <input id="end_date" name="end_date" type="date" value={newBaustelle.end_date} onChange={handleInputChange} className="input-field" required/>
+                    <input id="end_date" name="end_date" type="date" value={isEditMode && editingBaustelle ? editingBaustelle.end_date : newBaustelle.end_date} onChange={handleInputChange} className="input-field" required/>
+                </div>
+                <div className="md:col-span-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2"><Palette size={16}/>Farbe für Baustelle</label>
+                    <div className="flex gap-2 flex-wrap">
+                        {colorOptions.map((color) => (
+                            <button
+                                key={color}
+                                type="button"
+                                onClick={() => handleColorChange(color)}
+                                className={`w-8 h-8 rounded-full border-2 transition-all ${
+                                    (isEditMode && editingBaustelle ? editingBaustelle.color : newBaustelle.color) === color
+                                        ? 'border-slate-800 scale-110'
+                                        : 'border-slate-300 hover:border-slate-500'
+                                }`}
+                                style={{ backgroundColor: color }}
+                            />
+                        ))}
+                    </div>
                 </div>
             </div>
-            <div className="mt-6">
-                <button type="submit" className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                  <PlusCircle className="w-5 h-5" />
-                  <span>Baustelle anlegen</span>
+            <div className="mt-6 flex gap-3">
+                <button type="submit" className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                  {isEditMode ? (
+                    <>
+                      <Edit className="w-5 h-5" />
+                      <span>Baustelle aktualisieren</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-5 h-5" />
+                      <span>Baustelle anlegen</span>
+                    </>
+                  )}
                 </button>
+                {isEditMode && (
+                  <button 
+                    type="button" 
+                    onClick={cancelEdit}
+                    className="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    Abbrechen
+                  </button>
+                )}
             </div>
             {error && (
                 <div className="mt-4 bg-red-50 p-3 rounded-md flex items-center gap-2 text-sm text-red-600">
@@ -209,8 +347,16 @@ export default function BaustellenList() {
             {baustellen.map((b) => (
               <tr key={b.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-slate-900">{b.name}</div>
-                  <div className="text-sm text-slate-500">{b.address}</div>
+                  <div className="flex items-center">
+                    <div 
+                      className="w-3 h-3 rounded-full mr-3" 
+                      style={{ backgroundColor: b.color }}
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">{b.name}</div>
+                      <div className="text-sm text-slate-500">{b.address}</div>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                   {b.start_date && new Date(b.start_date).toLocaleDateString()} - {b.end_date && new Date(b.end_date).toLocaleDateString()}
@@ -221,18 +367,37 @@ export default function BaustellenList() {
                       b.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-slate-100 text-slate-800'
                   }`}>
-                    {b.status}
+                    {b.status === 'active' ? 'Aktiv' : b.status === 'planning' ? 'Planung' : b.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-4"><Edit className="w-4 h-4"/></button>
-                  <button className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4"/></button>
+                  <button 
+                    onClick={() => startEditBaustelle(b)}
+                    className="text-blue-600 hover:text-blue-900 mr-4"
+                  >
+                    <Edit className="w-4 h-4"/>
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteBaustelle(b.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 className="w-4 h-4"/>
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      
+      {baustellen.length === 0 && (
+        <div className="text-center py-8 text-slate-500">
+          <HardHat className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+          <p>Noch keine Baustellen erstellt.</p>
+          <p className="text-sm">Erstellen Sie Ihre erste Baustelle, um zu beginnen.</p>
+        </div>
+      )}
+      
       <style jsx>{`
         .input-field {
             appearance: none; display: block; width: 100%;

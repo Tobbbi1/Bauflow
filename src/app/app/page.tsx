@@ -6,10 +6,12 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import BaustellenList from '@/components/ProjectList'
+import TaskList from '@/components/TaskList'
+import Calendar from '@/components/Calendar'
 import {
   LayoutDashboard,
   HardHat,
-  Calendar,
+  Calendar as LucideCalendar,
   CheckSquare,
   Users,
   Timer,
@@ -78,7 +80,7 @@ export default function AppPage() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'baustellen', label: 'Baustellen', icon: HardHat },
-    { id: 'calendar', label: 'Kalender', icon: Calendar },
+    { id: 'calendar', label: 'Kalender', icon: LucideCalendar },
     { id: 'tasks', label: 'Aufgaben', icon: CheckSquare },
     { id: 'employees', label: 'Mitarbeiter', icon: Users },
     { id: 'timesheets', label: 'Stundenzettel', icon: Clock },
@@ -90,6 +92,10 @@ export default function AppPage() {
         return <DashboardContent profile={profile} />
       case 'baustellen':
         return <BaustellenList />
+      case 'calendar':
+        return <Calendar />
+      case 'tasks':
+        return <TaskList />
       case 'settings':
         return <SettingsContent />
       default:
@@ -288,7 +294,7 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
               <p className="text-sm text-slate-500">Morgen, 10:00 Uhr</p>
             </div>
             <div className="p-3 bg-purple-100 rounded-lg">
-              <Calendar className="w-6 h-6 text-purple-600" />
+              <LucideCalendar className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
