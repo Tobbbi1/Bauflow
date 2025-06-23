@@ -100,31 +100,32 @@ export default function BaustellenList() {
 
       // Try using server-side API instead of direct client insertion
       try {
+        // Access Token holen
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+          return;
+        }
         const response = await fetch('/api/projects/create', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             ...newBaustelle,
             company_id: profile.company_id
           }),
         });
-
         const result = await response.json();
-
         if (!response.ok) {
-          console.error('Debug - API error:', result);
           setError(result.error || 'Fehler beim Speichern der Baustelle');
           return;
         }
-
-        console.log('Debug - API success:', result);
         setBaustellen([result.data, ...baustellen])
         setNewBaustelle({ name: '', address: '', description: '', contact_person_name: '', start_date: '', end_date: '' });
         setIsFormVisible(false)
       } catch (apiError) {
-        console.error('Debug - API call failed:', apiError);
         setError('Netzwerkfehler beim Speichern der Baustelle');
       }
     }
