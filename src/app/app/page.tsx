@@ -8,6 +8,7 @@ import Logo from '@/components/Logo'
 import BaustellenList from '@/components/ProjectList'
 import TaskList from '@/components/TaskList'
 import Calendar from '@/components/Calendar'
+import EmployeeManagement from '@/components/EmployeeManagement'
 import {
   LayoutDashboard,
   HardHat,
@@ -33,6 +34,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 interface Profile {
   first_name: string;
   last_name: string;
+  role: string;
 }
 
 export default function AppPage() {
@@ -57,7 +59,7 @@ export default function AppPage() {
       setUser(user);
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, role')
         .eq('id', user.id)
         .single();
       
@@ -65,6 +67,10 @@ export default function AppPage() {
         console.error("Error fetching profile:", error);
         router.push('/auth/login');
       } else {
+        if (profileData.role === 'employee') {
+          router.push('/employee');
+          return;
+        }
         setProfile(profileData);
         setLoading(false);
       }
@@ -96,6 +102,8 @@ export default function AppPage() {
         return <Calendar />
       case 'tasks':
         return <TaskList />
+      case 'employees':
+        return <EmployeeManagement />
       case 'settings':
         return <SettingsContent />
       default:

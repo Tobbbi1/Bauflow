@@ -64,6 +64,8 @@ export default function Calendar() {
           .from('projects')
           .select('id, name, color, start_date, end_date, description')
           .eq('company_id', profileData.company_id)
+          .not('start_date', 'is', null)
+          .not('end_date', 'is', null)
 
         // Aufgaben laden
         const { data: tasksData, error: tasksError } = await supabase
@@ -74,6 +76,8 @@ export default function Calendar() {
             profiles!assigned_to(first_name, last_name)
           `)
           .eq('projects.company_id', profileData.company_id)
+          .not('start_date', 'is', null)
+          .not('end_date', 'is', null)
 
         const allEvents: CalendarEvent[] = []
 

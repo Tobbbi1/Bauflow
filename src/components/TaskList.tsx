@@ -124,7 +124,7 @@ export default function TaskList() {
           .select(`
             id, title, description, project_id, assigned_to, status, priority, 
             start_date, end_date, start_time, end_time, color, created_at,
-            projects!inner(name, color),
+            projects(name, color),
             profiles!assigned_to(first_name, last_name)
           `)
           .order('created_at', { ascending: false })
