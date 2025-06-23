@@ -8,6 +8,7 @@ interface Baustelle {
   id: string
   name: string
   address: string
+  description?: string
   status: string
   contact_person_name: string
   start_date: string
