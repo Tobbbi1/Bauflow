@@ -228,12 +228,9 @@ export default function AppPage() {
 
 function DashboardContent({ profile }: { profile: Profile | null }) {
     const [activeProjects, setActiveProjects] = useState<{id: string, name: string, address: string}[]>([]);
+    const [openTasks, setOpenTasks] = useState<{id: string, title: string, priority: string}[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
-    const openTasks = [
-        { id: 1, title: 'Fliesen im Bad legen', priority: 'high'},
-        { id: 2, title: 'Material für Dachstuhl bestellen', priority: 'high'},
-        { id: 3, title: 'Angebot für Fenster prüfen', priority: 'low'},
-    ]
+    const [loadingTasks, setLoadingTasks] = useState(true);
     const supabase = createClientComponentClient();
 
     useEffect(() => {
@@ -250,7 +247,27 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
             }
             setLoadingProjects(false);
         };
+
+        const fetchOpenTasks = async () => {
+            setLoadingTasks(true);
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('id, title, priority')
+                .in('status', ['pending', 'in_progress'])
+                .limit(5);
+
+            if (!error && data) {
+                setOpenTasks(data.map(task => ({
+                    id: task.id,
+                    title: task.title,
+                    priority: task.priority || 'medium'
+                })));
+            }
+            setLoadingTasks(false);
+        };
+
         fetchActiveProjects();
+        fetchOpenTasks();
     }, [supabase]);
     
     const quickActions = [
@@ -283,16 +300,28 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h2 className="text-xl font-semibold text-slate-800 mb-4">Offene Aufgaben</h2>
-           <ul className="space-y-3">
+          {loadingTasks ? (
+            <div className="flex justify-center items-center p-4">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+            </div>
+          ) : openTasks.length > 0 ? (
+            <ul className="space-y-3">
                 {openTasks.map(task => (
                     <li key={task.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                         <span className="font-medium text-slate-800">{task.title}</span>
-                         <span className={`text-sm font-semibold px-2 py-1 rounded-full ${task.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            {task.priority === 'high' ? 'Dringend' : 'Normal'}
+                         <span className={`text-sm font-semibold px-2 py-1 rounded-full ${
+                           task.priority === 'high' || task.priority === 'urgent' ? 'bg-red-100 text-red-700' : 
+                           task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                         }`}>
+                            {task.priority === 'high' || task.priority === 'urgent' ? 'Dringend' : 
+                             task.priority === 'medium' ? 'Mittel' : 'Niedrig'}
                         </span>
                     </li>
                 ))}
             </ul>
+          ) : (
+            <p className="text-center py-4 text-slate-500">Keine offenen Aufgaben vorhanden.</p>
+          )}
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
@@ -335,10 +364,96 @@ function DashboardContent({ profile }: { profile: Profile | null }) {
 }
 
 function SettingsContent() {
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const supabase = createClientComponentClient()
+  const router = useRouter()
+
+  const handleDeleteAccount = async () => {
+    if (!confirm('Sind Sie sicher, dass Sie Ihren Account und alle Daten unwiderruflich löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        // Alle Daten des Benutzers löschen
+        const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id)
+        
+        if (deleteError) {
+          alert('Fehler beim Löschen des Accounts: ' + deleteError.message)
+          setIsDeleting(false)
+          return
+        }
+
+        // Abmelden und zur Startseite weiterleiten
+        await supabase.auth.signOut()
+        router.push('/')
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('Fehler beim Löschen des Accounts:', error)
+      alert('Fehler beim Löschen des Accounts')
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 text-foreground">
-        <h2 className="text-2xl font-bold text-slate-800 mb-4">Einstellungen</h2>
-        <p className="text-slate-600">Hier können Sie Ihre Kontoeinstellungen und Firmendaten verwalten.</p>
+      <h2 className="text-2xl font-bold text-slate-800 mb-6">Einstellungen</h2>
+      
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-700 mb-3">Kontoeinstellungen</h3>
+          <p className="text-slate-600 mb-4">Hier können Sie Ihre Kontoeinstellungen und Firmendaten verwalten.</p>
+        </div>
+
+        <div className="border-t border-slate-200 pt-6">
+          <h3 className="text-lg font-semibold text-red-700 mb-3">Gefährliche Aktionen</h3>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="font-medium text-red-800 mb-2">Account löschen</h4>
+            <p className="text-red-600 text-sm mb-4">
+              Wenn Sie Ihren Account löschen, werden alle Ihre Daten unwiderruflich entfernt. 
+              Dies umfasst alle Baustellen, Aufgaben und andere Informationen.
+            </p>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isDeleting ? 'Wird gelöscht...' : 'Account löschen'}
+            </button>
+          </div>
+        </div>
+
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-red-700 mb-4">Account wirklich löschen?</h3>
+              <p className="text-slate-600 mb-6">
+                Diese Aktion kann nicht rückgängig gemacht werden. Alle Ihre Daten werden unwiderruflich gelöscht.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isDeleting ? 'Wird gelöscht...' : 'Endgültig löschen'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 } 

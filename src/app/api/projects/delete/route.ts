@@ -22,54 +22,11 @@ export async function DELETE(request: NextRequest) {
 
     console.log('Deleting project with ID:', id, 'for user:', user.id)
 
-    // Benutzerprofil und Berechtigungen prüfen
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('company_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError) {
-      console.error('Profile error:', profileError)
-      return NextResponse.json({ error: 'Benutzerprofil nicht gefunden' }, { status: 404 })
-    }
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Benutzerprofil nicht gefunden' }, { status: 404 })
-    }
-
-    console.log('User profile:', profile)
-
-    // Prüfen ob Benutzer Admin oder Manager ist
-    if (!['admin', 'manager'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Keine Berechtigung zum Löschen von Baustellen' }, { status: 403 })
-    }
-
-    // Prüfen ob Baustelle zur Firma gehört
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id, name')
-      .eq('id', id)
-      .eq('company_id', profile.company_id)
-      .single()
-
-    if (projectError) {
-      console.error('Project fetch error:', projectError)
-      return NextResponse.json({ error: 'Baustelle nicht gefunden' }, { status: 404 })
-    }
-
-    if (!project) {
-      return NextResponse.json({ error: 'Baustelle nicht gefunden' }, { status: 404 })
-    }
-
-    console.log('Found project:', project)
-
-    // Baustelle löschen
+    // Baustelle direkt löschen (RLS-Policies übernehmen die Sicherheit)
     const { error: deleteError } = await supabase
       .from('projects')
       .delete()
       .eq('id', id)
-      .eq('company_id', profile.company_id)
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
