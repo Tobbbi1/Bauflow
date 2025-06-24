@@ -14,7 +14,9 @@ import {
   Lock, 
   ChevronUp,
   Eye,
-  EyeOff
+  EyeOff,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 
 interface Employee {
@@ -24,6 +26,7 @@ interface Employee {
   email: string
   role: string
   created_at: string
+  email_verified?: boolean
 }
 
 interface Profile {
@@ -39,11 +42,14 @@ export default function EmployeeManagement() {
     first_name: '',
     last_name: '',
     email: '',
-    password: ''
+    password: '',
+    role: 'employee'
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const supabase = createClientComponentClient()
 
   useEffect(() => {
@@ -69,7 +75,7 @@ export default function EmployeeManagement() {
         // Mitarbeiter laden
         const { data: employeesData, error: employeesError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, role, created_at')
+          .select('id, first_name, last_name, role, created_at, email_verified')
           .eq('company_id', profileData.company_id)
           .order('created_at', { ascending: false })
 
@@ -82,7 +88,8 @@ export default function EmployeeManagement() {
               const { data: userData } = await supabase.auth.admin.getUserById(employee.id)
               return {
                 ...employee,
-                email: userData?.user?.email || 'Unbekannt'
+                email: userData?.user?.email || 'Unbekannt',
+                email_verified: userData?.user?.email_confirmed_at ? true : false
               }
             })
           )
@@ -95,7 +102,7 @@ export default function EmployeeManagement() {
     fetchInitialData()
   }, [supabase])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setNewEmployee(prev => ({ ...prev, [name]: value }))
   }
@@ -106,7 +113,10 @@ export default function EmployeeManagement() {
       setError("Benutzerprofil nicht geladen. Bitte laden Sie die Seite neu.")
       return
     }
+    
     setError(null)
+    setSuccess(null)
+    setSubmitting(true)
 
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -140,16 +150,22 @@ export default function EmployeeManagement() {
           last_name: result.data.last_name,
           email: result.data.email,
           role: result.data.role,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          email_verified: true
         }
 
         setEmployees([newEmployeeWithDetails, ...employees])
-        setNewEmployee({ first_name: '', last_name: '', email: '', password: '' })
+        setNewEmployee({ first_name: '', last_name: '', email: '', password: '', role: 'employee' })
         setIsFormVisible(false)
+        setSuccess('Mitarbeiter erfolgreich erstellt!')
+        
+        // Success-Nachricht nach 3 Sekunden ausblenden
+        setTimeout(() => setSuccess(null), 3000)
       } catch (apiError) {
         setError('Netzwerkfehler beim Erstellen des Mitarbeiters')
       }
     }
+    setSubmitting(false)
   }
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -174,6 +190,10 @@ export default function EmployeeManagement() {
 
       // Mitarbeiter aus der Liste entfernen
       setEmployees(prev => prev.filter(employee => employee.id !== employeeId))
+      setSuccess('Mitarbeiter erfolgreich gelöscht!')
+      
+      // Success-Nachricht nach 3 Sekunden ausblenden
+      setTimeout(() => setSuccess(null), 3000)
     } catch (apiError) {
       setError('Netzwerkfehler beim Löschen des Mitarbeiters')
     }
@@ -296,21 +316,44 @@ export default function EmployeeManagement() {
                 </button>
               </div>
             </div>
+
+            <div>
+              <label htmlFor="role" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+                <User size={16}/>Rolle
+              </label>
+              <select 
+                id="role" 
+                name="role" 
+                value={newEmployee.role} 
+                onChange={handleInputChange} 
+                className="input-field" 
+                required
+              >
+                <option value="employee">Mitarbeiter</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
           </div>
           
           <div className="mt-6">
             <button 
               type="submit" 
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={submitting}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <PlusCircle className="w-5 h-5" />
-              <span>Mitarbeiter erstellen</span>
+              {submitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <PlusCircle className="w-5 h-5" />
+              )}
+              <span>{submitting ? 'Erstelle...' : 'Mitarbeiter erstellen'}</span>
             </button>
           </div>
           
           {error && (
             <div className="mt-4 bg-red-50 p-3 rounded-md flex items-center gap-2 text-sm text-red-600">
-              <AlertCircle className="h-5 w-5"/>
+              <XCircle className="h-5 w-5"/>
               <span>Fehler: {error}</span>
             </div>
           )}
@@ -324,6 +367,7 @@ export default function EmployeeManagement() {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Mitarbeiter</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">E-Mail</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Rolle</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Erstellt</th>
               <th scope="col" className="relative px-6 py-3"><span className="sr-only">Aktionen</span></th>
             </tr>
@@ -351,13 +395,25 @@ export default function EmployeeManagement() {
                     {getRoleText(employee.role)}
                   </span>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    {employee.email_verified ? (
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-500" />
+                    )}
+                    <span className="text-sm text-slate-600">
+                      {employee.email_verified ? 'Verifiziert' : 'Nicht verifiziert'}
+                    </span>
+                  </div>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                   {new Date(employee.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button 
                     onClick={() => handleDeleteEmployee(employee.id)}
-                    className="text-red-600 hover:text-red-900"
+                    className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={employee.role === 'admin'}
                     title={employee.role === 'admin' ? 'Administratoren können nicht gelöscht werden' : 'Mitarbeiter löschen'}
                   >
@@ -375,6 +431,13 @@ export default function EmployeeManagement() {
           <Users className="w-12 h-12 mx-auto mb-4 text-slate-300" />
           <p>Noch keine Mitarbeiter erstellt.</p>
           <p className="text-sm">Erstellen Sie Ihren ersten Mitarbeiter, um zu beginnen.</p>
+        </div>
+      )}
+      
+      {success && (
+        <div className="mt-4 bg-green-50 p-3 rounded-md flex items-center gap-2 text-sm text-green-600">
+          <CheckCircle className="h-5 w-5"/>
+          <span>{success}</span>
         </div>
       )}
       

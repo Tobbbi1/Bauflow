@@ -38,14 +38,42 @@ export default function Calendar() {
   const [hoveredEvent, setHoveredEvent] = useState<CalendarEvent | null>(null)
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [debugInfo, setDebugInfo] = useState<string>('')
   const supabase = createClientComponentClient()
+
+  const loadTestData = async () => {
+    try {
+      const response = await fetch('/api/test-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        setDebugInfo('Test-Daten erfolgreich geladen! Seite wird neu geladen...')
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+      } else {
+        const error = await response.json()
+        setDebugInfo(`Fehler: ${error.error}`)
+      }
+    } catch (error) {
+      setDebugInfo('Fehler beim Laden der Test-Daten')
+    }
+  }
 
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true)
+      setDebugInfo('Starte Datenabfrage...')
+      
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
+        setDebugInfo(`Benutzer gefunden: ${user.email}`)
+        
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('company_id')
@@ -53,11 +81,13 @@ export default function Calendar() {
           .single()
         
         if (profileError) {
+          setDebugInfo(`Profil-Fehler: ${profileError.message}`)
           setLoading(false)
           return
         } 
         
         setProfile(profileData)
+        setDebugInfo(`Company ID: ${profileData.company_id}`)
         
         // Baustellen laden
         const { data: projectsData, error: projectsError } = await supabase
@@ -66,6 +96,12 @@ export default function Calendar() {
           .eq('company_id', profileData.company_id)
           .not('start_date', 'is', null)
           .not('end_date', 'is', null)
+
+        if (projectsError) {
+          setDebugInfo(`Projekte-Fehler: ${projectsError.message}`)
+        } else {
+          setDebugInfo(`Projekte gefunden: ${projectsData?.length || 0}`)
+        }
 
         // Aufgaben laden
         const { data: tasksData, error: tasksError } = await supabase
@@ -79,6 +115,12 @@ export default function Calendar() {
           .not('start_date', 'is', null)
           .not('end_date', 'is', null)
 
+        if (tasksError) {
+          setDebugInfo(`Aufgaben-Fehler: ${tasksError.message}`)
+        } else {
+          setDebugInfo(`Aufgaben gefunden: ${tasksData?.length || 0}`)
+        }
+
         const allEvents: CalendarEvent[] = []
 
         // Baustellen als Events hinzufügen
@@ -91,7 +133,7 @@ export default function Calendar() {
                 description: project.description,
                 start_date: project.start_date,
                 end_date: project.end_date,
-                color: project.color,
+                color: project.color || '#3B82F6',
                 type: 'project'
               })
             }
@@ -110,9 +152,9 @@ export default function Calendar() {
                 end_date: task.end_date,
                 start_time: task.start_time,
                 end_time: task.end_time,
-                color: task.color,
+                color: task.color || '#10B981',
                 type: 'task',
-                project_name: task.projects.name,
+                project_name: task.projects?.name,
                 assigned_to_name: task.profiles ? `${task.profiles.first_name} ${task.profiles.last_name}` : 'Nicht zugewiesen',
                 status: task.status,
                 priority: task.priority
@@ -121,7 +163,10 @@ export default function Calendar() {
           })
         }
 
+        setDebugInfo(`Gesamte Events: ${allEvents.length}`)
         setEvents(allEvents)
+      } else {
+        setDebugInfo('Kein Benutzer gefunden')
       }
       setLoading(false)
     }
@@ -163,12 +208,24 @@ export default function Calendar() {
     const eventEnd = new Date(event.end_date)
     const currentDate = new Date(date)
     
+    // Berechne die Gesamtdauer des Events in Tagen
     const totalDays = Math.ceil((eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    
+    // Berechne, an welchem Tag im Event wir uns befinden
     const dayInEvent = Math.ceil((currentDate.getTime() - eventStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
     
+    // Wenn es der erste Tag des Events ist, zeige es von Anfang an
+    if (dayInEvent === 1) {
+      return {
+        width: `${(1 / totalDays) * 100}%`,
+        left: '0%'
+      }
+    }
+    
+    // Ansonsten verstecke das Event (es wird an anderen Tagen angezeigt)
     return {
-      width: `${(1 / totalDays) * 100}%`,
-      left: `${((dayInEvent - 1) / totalDays) * 100}%`
+      width: '0%',
+      left: '0%'
     }
   }
 
@@ -258,6 +315,23 @@ export default function Calendar() {
         </div>
       </div>
 
+      {/* Debug Info */}
+      {debugInfo && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">{debugInfo}</p>
+        </div>
+      )}
+
+      {/* Test-Daten Button */}
+      <div className="mb-4">
+        <button
+          onClick={loadTestData}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+        >
+          Test-Daten laden
+        </button>
+      </div>
+
       {/* Kalender Grid */}
       <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-lg overflow-hidden">
         {/* Wochentage Header */}
@@ -287,28 +361,62 @@ export default function Calendar() {
                 {date.getDate()}
               </div>
 
-              {/* Events */}
-              <div className="space-y-1">
+              {/* Events Container */}
+              <div className="relative h-20">
                 {dayEvents.map(event => {
-                  const position = getEventPosition(event, date)
-                  const isFirstDay = date.toDateString() === new Date(event.start_date).toDateString()
+                  const eventStart = new Date(event.start_date)
+                  const eventEnd = new Date(event.end_date)
+                  const currentDate = new Date(date)
+                  const isFirstDay = currentDate.getTime() === eventStart.getTime()
+                  const isLastDay = currentDate.getTime() === eventEnd.getTime()
+                  
+                  // Berechne die Breite basierend auf der Gesamtdauer
+                  const totalDays = Math.ceil((eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                  const dayInEvent = Math.ceil((currentDate.getTime() - eventStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                  
+                  let width = '100%'
+                  let left = '0%'
+                  
+                  if (totalDays > 1) {
+                    if (isFirstDay) {
+                      // Erster Tag: Zeige von Anfang bis Ende des Tages
+                      width = `${(1 / totalDays) * 100}%`
+                      left = '0%'
+                    } else if (isLastDay) {
+                      // Letzter Tag: Zeige von Anfang des Tages bis Ende
+                      width = `${(1 / totalDays) * 100}%`
+                      left = `${((dayInEvent - 1) / totalDays) * 100}%`
+                    } else {
+                      // Mittlere Tage: Zeige den ganzen Tag
+                      width = `${(1 / totalDays) * 100}%`
+                      left = `${((dayInEvent - 1) / totalDays) * 100}%`
+                    }
+                  }
                   
                   return (
                     <div
                       key={`${event.id}-${date.toDateString()}`}
-                      className={`relative h-6 rounded text-xs font-medium text-white cursor-pointer transition-all hover:opacity-80 ${
-                        isFirstDay ? '' : 'hidden'
-                      }`}
+                      className="absolute h-6 rounded text-xs font-medium text-white cursor-pointer transition-all hover:opacity-80"
                       style={{
                         backgroundColor: event.color,
-                        width: position.width,
-                        left: position.left
+                        width: width,
+                        left: left,
+                        top: `${(dayEvents.indexOf(event) * 24)}px`
                       }}
-                      onMouseEnter={() => setHoveredEvent(event)}
+                      onMouseEnter={(e) => {
+                        setHoveredEvent(event)
+                        // Position des Tooltips basierend auf Mausposition
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        const tooltip = document.getElementById('event-tooltip')
+                        if (tooltip) {
+                          tooltip.style.left = `${rect.left}px`
+                          tooltip.style.top = `${rect.bottom + 5}px`
+                        }
+                      }}
                       onMouseLeave={() => setHoveredEvent(null)}
                     >
                       <div className="px-2 py-1 truncate">
-                        {event.title}
+                        {isFirstDay ? event.title : ''}
                       </div>
                     </div>
                   )
@@ -321,7 +429,15 @@ export default function Calendar() {
 
       {/* Tooltip für Event Details */}
       {hoveredEvent && (
-        <div className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-lg p-4 max-w-sm">
+        <div 
+          id="event-tooltip"
+          className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-lg p-4 max-w-sm"
+          style={{
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
           <div className="flex items-start gap-3">
             <div 
               className="w-4 h-4 rounded-full mt-1 flex-shrink-0" 
