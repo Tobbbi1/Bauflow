@@ -27,7 +27,8 @@ import {
   User,
   Clock,
   Wrench,
-  Loader2
+  Loader2,
+  Building2
 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
@@ -406,8 +407,22 @@ function SettingsContent() {
       
       <div className="space-y-6">
         <div>
+          <h3 className="text-lg font-semibold text-slate-700 mb-3">Firmen-Einstellungen</h3>
+          <p className="text-slate-600 mb-4">
+            Verwalten Sie Ihre Firmendaten, die für Stundenzettel und andere Dokumente verwendet werden.
+          </p>
+          <Link 
+            href="/app/settings" 
+            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Building2 className="w-4 h-4" />
+            Firmen-Daten bearbeiten
+          </Link>
+        </div>
+
+        <div className="border-t border-slate-200 pt-6">
           <h3 className="text-lg font-semibold text-slate-700 mb-3">Kontoeinstellungen</h3>
-          <p className="text-slate-600 mb-4">Hier können Sie Ihre Kontoeinstellungen und Firmendaten verwalten.</p>
+          <p className="text-slate-600 mb-4">Hier können Sie Ihre Kontoeinstellungen verwalten.</p>
         </div>
 
         <div className="border-t border-slate-200 pt-6">
