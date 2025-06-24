@@ -108,8 +108,6 @@ CREATE TABLE public.tasks (
     priority VARCHAR(20) DEFAULT 'medium', -- low, medium, high, urgent
     start_date DATE, -- Startdatum der Aufgabe
     end_date DATE, -- Enddatum der Aufgabe
-    start_time TIME, -- Startzeit (optional)
-    end_time TIME, -- Endzeit (optional)
     estimated_hours DECIMAL(5,2),
     actual_hours DECIMAL(5,2),
     color VARCHAR(7), -- Farbe der Aufgabe (wird von der Baustelle übernommen)
@@ -330,3 +328,7 @@ INSERT INTO public.companies (name, address, phone, email) VALUES
 
 -- Note: Sample users werden über die Registrierung erstellt
 -- Mitarbeiter können über das Admin-Interface eingeladen werden 
+
+-- Entferne die Spalten start_time und end_time aus der Tabelle public.tasks
+ALTER TABLE public.tasks DROP COLUMN IF EXISTS start_time;
+ALTER TABLE public.tasks DROP COLUMN IF EXISTS end_time; 

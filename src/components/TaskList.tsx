@@ -484,34 +484,6 @@ export default function TaskList() {
             </div>
 
             <div>
-              <label htmlFor="start_time" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
-                <Clock size={16}/>Start-Zeit (optional)
-              </label>
-              <input 
-                id="start_time" 
-                name="start_time" 
-                type="time" 
-                value={isEditMode && editingTask ? editingTask.start_time : newTask.start_time} 
-                onChange={handleInputChange} 
-                className="input-field"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="end_time" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
-                <Clock size={16}/>End-Zeit (optional)
-              </label>
-              <input 
-                id="end_time" 
-                name="end_time" 
-                type="time" 
-                value={isEditMode && editingTask ? editingTask.end_time : newTask.end_time} 
-                onChange={handleInputChange} 
-                className="input-field"
-              />
-            </div>
-
-            <div>
               <label htmlFor="status" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
                 <CheckSquare size={16}/>Status
               </label>
@@ -622,11 +594,6 @@ export default function TaskList() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                   {task.start_date && new Date(task.start_date).toLocaleDateString()} - {task.end_date && new Date(task.end_date).toLocaleDateString()}
-                  {task.start_time && task.end_time && (
-                    <div className="text-xs text-slate-400">
-                      {task.start_time} - {task.end_time}
-                    </div>
-                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col gap-1">

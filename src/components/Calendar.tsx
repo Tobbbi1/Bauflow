@@ -150,8 +150,6 @@ export default function Calendar() {
                 description: task.description,
                 start_date: task.start_date,
                 end_date: task.end_date,
-                start_time: task.start_time,
-                end_time: task.end_time,
                 color: task.color || '#10B981',
                 type: 'task',
                 project_name: task.projects?.name,
@@ -461,15 +459,6 @@ export default function Calendar() {
                     {new Date(hoveredEvent.start_date).toLocaleDateString()} - {new Date(hoveredEvent.end_date).toLocaleDateString()}
                   </span>
                 </div>
-
-                {hoveredEvent.start_time && hoveredEvent.end_time && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <span>
-                      {formatTime(hoveredEvent.start_time)} - {formatTime(hoveredEvent.end_time)}
-                    </span>
-                  </div>
-                )}
 
                 {hoveredEvent.type === 'task' && hoveredEvent.project_name && (
                   <div className="flex items-center gap-2">
