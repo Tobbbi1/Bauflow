@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         data: {
           firstName,
           lastName,
-          companyId: company.id,
+          company_id: company.id,
           role: 'admin',
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify`,
