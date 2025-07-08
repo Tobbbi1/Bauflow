@@ -367,16 +367,24 @@ export default function BaustellenList() {
                     value={b.status}
                     onChange={async (e) => {
                       const newStatus = e.target.value;
-                      const { data: { session } } = await supabase.auth.getSession();
-                      await fetch('/api/projects/update', {
-                        method: 'PUT',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${session.access_token}`,
-                        },
-                        body: JSON.stringify({ ...b, status: newStatus }),
-                      });
-                      setBaustellen(prev => prev.map(baustelle => b.id === b.id ? { ...baustelle, status: newStatus } : baustelle));
+                      try {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        if (!session?.access_token) {
+                          setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+                          return;
+                        }
+                        await fetch('/api/projects/update', {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`,
+                          },
+                          body: JSON.stringify({ ...b, status: newStatus }),
+                        });
+                        setBaustellen(prev => prev.map(baustelle => baustelle.id === b.id ? { ...baustelle, status: newStatus } : baustelle));
+                      } catch (error) {
+                        setError('Fehler beim Aktualisieren des Status');
+                      }
                     }}
                     className="input-field"
                   >
