@@ -156,32 +156,40 @@ export default function TaskList() {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch("/api/tasks/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ ...newTask, assigned_to: null }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error || "Fehler beim Speichern der Aufgabe");
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+          return;
+        }
+        const response = await fetch("/api/tasks/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ ...newTask, assigned_to: null }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          setError(result.error || "Fehler beim Speichern der Aufgabe");
+          return;
+        }
+        setTasks([result.data, ...tasks]);
+        setNewTask({
+          title: "",
+          description: "",
+          project_id: "",
+          assigned_to: "",
+          status: "pending",
+          priority: "medium",
+          start_date: "",
+          end_date: "",
+        });
+        setIsFormVisible(false);
+      } catch (error) {
+        setError('Fehler beim Erstellen der Aufgabe');
       }
-      setTasks([result.data, ...tasks]);
-      setNewTask({
-        title: "",
-        description: "",
-        project_id: "",
-        assigned_to: "",
-        status: "pending",
-        priority: "medium",
-        start_date: "",
-        end_date: "",
-      });
-      setIsFormVisible(false);
     }
   };
 
@@ -374,30 +382,41 @@ export default function TaskList() {
                     value={task.assigned_to || ""}
                     onChange={async (e) => {
                       const newAssignedTo = e.target.value || null;
-                      const { data: { session } } = await supabase.auth.getSession();
-                      await fetch("/api/tasks/update", {
-                        method: "PUT",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${session.access_token}`,
-                        },
-                        body: JSON.stringify({ ...task, assigned_to: newAssignedTo }),
-                      });
-                      setTasks((prev) =>
-                        prev.map((t) =>
-                          t.id === task.id
-                            ? {
-                                ...t,
-                                assigned_to: newAssignedTo,
-                                assigned_to_name:
-                                  employees.find((e) => e.id === newAssignedTo)?.first_name +
-                                    " " +
-                                    employees.find((e) => e.id === newAssignedTo)?.last_name ||
-                                  "Nicht zugewiesen",
-                              }
-                            : t
-                        )
-                      );
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (user) {
+                        try {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (!session?.access_token) {
+                            setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+                            return;
+                          }
+                          await fetch("/api/tasks/update", {
+                            method: "PUT",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${session.access_token}`,
+                            },
+                            body: JSON.stringify({ ...task, assigned_to: newAssignedTo }),
+                          });
+                          setTasks((prev) =>
+                            prev.map((t) =>
+                              t.id === task.id
+                                ? {
+                                    ...t,
+                                    assigned_to: newAssignedTo,
+                                    assigned_to_name:
+                                      employees.find((e) => e.id === newAssignedTo)?.first_name +
+                                        " " +
+                                        employees.find((e) => e.id === newAssignedTo)?.last_name ||
+                                      "Nicht zugewiesen",
+                                  }
+                                : t
+                            )
+                          );
+                        } catch (error) {
+                          setError('Fehler beim Zuweisen des Mitarbeiters');
+                        }
+                      }
                     }}
                     className="input-field"
                   >
@@ -430,20 +449,31 @@ export default function TaskList() {
                     value={task.priority}
                     onChange={async (e) => {
                       const newPriority = e.target.value;
-                      const { data: { session } } = await supabase.auth.getSession();
-                      await fetch("/api/tasks/update", {
-                        method: "PUT",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${session.access_token}`,
-                        },
-                        body: JSON.stringify({ ...task, priority: newPriority }),
-                      });
-                      setTasks((prev) =>
-                        prev.map((t) =>
-                          t.id === task.id ? { ...t, priority: newPriority } : t
-                        )
-                      );
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (user) {
+                        try {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (!session?.access_token) {
+                            setError('Keine gültige Sitzung gefunden. Bitte melden Sie sich erneut an.');
+                            return;
+                          }
+                          await fetch("/api/tasks/update", {
+                            method: "PUT",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${session.access_token}`,
+                            },
+                            body: JSON.stringify({ ...task, priority: newPriority }),
+                          });
+                          setTasks((prev) =>
+                            prev.map((t) =>
+                              t.id === task.id ? { ...t, priority: newPriority } : t
+                            )
+                          );
+                        } catch (error) {
+                          setError('Fehler beim Ändern der Priorität');
+                        }
+                      }
                     }}
                     className="input-field"
                   >
