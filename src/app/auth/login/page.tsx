@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Logo from '@/components/Logo'
 import { Mail, Lock, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -20,28 +22,27 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.error === 'Invalid login credentials') {
-          throw new Error('Falsche E-Mail-Adresse oder Passwort. Bitte versuchen Sie es erneut.');
-        } else if (data.error === 'Email not confirmed') {
-          throw new Error('Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Wir haben Ihnen eine neue E-Mail gesendet.');
+      if (authError) {
+        if (authError.message === 'Invalid login credentials') {
+          throw new Error('Falsche E-Mail-Adresse oder Passwort. Bitte versuchen Sie es erneut.')
+        } else if (authError.message === 'Email not confirmed') {
+          throw new Error('Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse.')
         }
-        throw new Error(data.error || 'Ein unbekannter Fehler ist aufgetreten.');
+        throw new Error(authError.message || 'Ein unbekannter Fehler ist aufgetreten.')
       }
-      
-      router.push('/app');
-      router.refresh();
+
+      if (authData.user) {
+        router.push('/app')
+        router.refresh()
+      }
 
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message)
     } finally {
       setLoading(false)
     }

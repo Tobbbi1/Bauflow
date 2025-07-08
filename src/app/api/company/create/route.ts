@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const supabase = createClient()
     const body = await request.json()
 
-    const { name, address, phone, email, website } = body
+    const { name, address, phone, email, website, first_name, last_name } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Firmenname ist erforderlich' }, { status: 400 })
@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
       .upsert({
         id: user.id,
         company_id: company.id,
+        first_name: first_name || null,
+        last_name: last_name || null,
         email: user.email,
         role: 'admin'
       })

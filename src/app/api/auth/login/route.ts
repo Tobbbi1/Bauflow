@@ -1,28 +1,45 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const { email, password } = await request.json()
-  const supabase = createRouteHandlerClient({ cookies })
+  try {
+    const supabase = createClient()
+    const { email, password } = await request.json()
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+    if (!email || !password) {
+      return NextResponse.json({ error: 'E-Mail und Passwort sind erforderlich' }, { status: 400 })
+    }
 
-  // If email is not confirmed, Supabase returns data but with a null session.
-  // The error object is also null in this case. We need to check for this explicitly.
-  if (data.user && data.user.aud !== 'authenticated') {
-      // Optionally, re-send the confirmation email
-      await supabase.auth.resend({ type: 'signup', email: email });
-      return NextResponse.json({ error: 'Email not confirmed' }, { status: 401 });
+    // Sign in user
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (authError) {
+      console.error('Login error:', authError)
+      
+      if (authError.message === 'Invalid login credentials') {
+        return NextResponse.json({ error: 'Invalid login credentials' }, { status: 401 })
+      }
+      if (authError.message === 'Email not confirmed') {
+        return NextResponse.json({ error: 'Email not confirmed' }, { status: 401 })
+      }
+      
+      return NextResponse.json({ error: authError.message }, { status: 400 })
+    }
+
+    if (!authData.user) {
+      return NextResponse.json({ error: 'Anmeldung fehlgeschlagen' }, { status: 400 })
+    }
+
+    return NextResponse.json({ 
+      message: 'Anmeldung erfolgreich',
+      user: authData.user 
+    })
+
+  } catch (error) {
+    console.error('Server error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: error.status || 401 })
-  }
-
-  return NextResponse.json({ message: 'Login successful' }, { status: 200 })
 } 

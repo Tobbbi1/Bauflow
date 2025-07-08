@@ -75,6 +75,9 @@ export default function RegisterPage() {
         return
       }
 
+      // Wait a bit for user to be created
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
       // 2. Create company
       const companyResponse = await fetch('/api/company/create', {
         method: 'POST',
@@ -84,7 +87,9 @@ export default function RegisterPage() {
           address: companyData.address,
           phone: companyData.phone,
           email: companyData.email,
-          website: companyData.website
+          website: companyData.website,
+          first_name: personalData.firstName,
+          last_name: personalData.lastName
         })
       })
 
@@ -105,15 +110,20 @@ export default function RegisterPage() {
           last_name: personalData.lastName,
           email: personalData.email,
           role: 'geschäftsführer',
-          user_id: authData.user.id
+          user_id: authData.user.id,
+          company_id: company.id
         })
       })
 
       if (employeeResponse.ok) {
-        router.push('/app?welcome=true')
+        // Show success message or redirect
+        setError('')
+        alert('Registrierung erfolgreich! Sie können sich jetzt anmelden.')
+        router.push('/auth/login')
       } else {
-        console.error('Employee creation failed, but continuing...')
-        router.push('/app?welcome=true')
+        const employeeError = await employeeResponse.json()
+        console.error('Employee creation failed:', employeeError)
+        setError('Firma wurde erstellt, aber Mitarbeiter-Account konnte nicht angelegt werden. Bitte kontaktieren Sie den Support.')
       }
 
     } catch (error) {
