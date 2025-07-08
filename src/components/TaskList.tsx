@@ -84,6 +84,13 @@ export default function TaskList() {
           .select("company_id")
           .eq("id", user.id)
           .single();
+        
+        if (!profileData?.company_id) {
+          setError('Benutzerprofil nicht gefunden');
+          setLoading(false);
+          return;
+        }
+        
         setProfile(profileData);
 
         const { data: projectsData } = await supabase
