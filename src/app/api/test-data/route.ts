@@ -66,8 +66,8 @@ export async function POST() {
         )
       ON CONFLICT (id) DO NOTHING;
 
-      -- Test-Aufgaben erstellen
-      INSERT INTO public.tasks (id, title, description, project_id, assigned_to, status, priority, start_date, end_date, start_time, end_time, color)
+      -- Test-Aufgaben erstellen (ohne start_time/end_time, assigned_to kann NULL sein)
+      INSERT INTO public.tasks (id, title, description, project_id, assigned_to, status, priority, start_date, end_date, color)
       VALUES 
         (
           '550e8400-e29b-41d4-a716-446655440005',
@@ -79,8 +79,6 @@ export async function POST() {
           'high',
           '2024-01-15',
           '2024-01-20',
-          '08:00',
-          '16:00',
           '#3B82F6'
         ),
         (
@@ -88,13 +86,11 @@ export async function POST() {
           'Mauern errichten',
           'Außenwände und Innenwände mauern',
           '550e8400-e29b-41d4-a716-446655440002',
-          '${user.id}',
+          NULL,
           'pending',
           'medium',
           '2024-01-25',
           '2024-02-15',
-          '07:00',
-          '15:00',
           '#3B82F6'
         ),
         (
@@ -107,8 +103,6 @@ export async function POST() {
           'high',
           '2024-02-20',
           '2024-03-10',
-          '07:00',
-          '15:00',
           '#3B82F6'
         ),
         (
@@ -116,13 +110,11 @@ export async function POST() {
           'Planung Bürogebäude',
           'Detaillierte Planung der Sanierungsarbeiten',
           '550e8400-e29b-41d4-a716-446655440003',
-          '${user.id}',
+          NULL,
           'in_progress',
           'urgent',
           '2024-02-01',
           '2024-02-28',
-          '09:00',
-          '17:00',
           '#10B981'
         ),
         (
@@ -135,8 +127,6 @@ export async function POST() {
           'medium',
           '2024-03-01',
           '2024-03-15',
-          '08:00',
-          '16:00',
           '#10B981'
         ),
         (
@@ -144,13 +134,11 @@ export async function POST() {
           'Genehmigung einholen',
           'Baugenehmigung für Kindergarten-Erweiterung beantragen',
           '550e8400-e29b-41d4-a716-446655440004',
-          '${user.id}',
+          NULL,
           'pending',
           'urgent',
           '2024-03-01',
           '2024-04-30',
-          '09:00',
-          '17:00',
           '#F59E0B'
         )
       ON CONFLICT (id) DO NOTHING;

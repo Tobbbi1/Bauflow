@@ -1,4 +1,4 @@
--- Test-Daten für Kalender
+-- Test-Daten für Kalender mit aktuellen Datumsangaben
 -- Zuerst eine Test-Firma erstellen
 INSERT INTO public.companies (id, name, address, phone, email) 
 VALUES (
@@ -20,7 +20,7 @@ VALUES (
   true
 ) ON CONFLICT (id) DO NOTHING;
 
--- Test-Projekte (Baustellen) erstellen
+-- Test-Projekte (Baustellen) mit aktuellen Datumsangaben erstellen
 INSERT INTO public.projects (id, name, address, description, start_date, end_date, status, color, company_id, created_by)
 VALUES 
   (
@@ -28,8 +28,8 @@ VALUES
     'Wohnhaus Neubau',
     'Hauptstraße 45, 12345 Musterstadt',
     'Einfamilienhaus mit Keller und Garage',
-    '2024-01-15',
-    '2024-06-30',
+    '2024-12-01',
+    '2025-06-30',
     'in_progress',
     '#3B82F6',
     '550e8400-e29b-41d4-a716-446655440000',
@@ -40,8 +40,8 @@ VALUES
     'Bürogebäude Sanierung',
     'Industriestraße 78, 12345 Musterstadt',
     'Komplette Sanierung des 3-stöckigen Bürogebäudes',
-    '2024-02-01',
-    '2024-08-15',
+    '2025-01-15',
+    '2025-08-15',
     'planning',
     '#10B981',
     '550e8400-e29b-41d4-a716-446655440000',
@@ -52,8 +52,8 @@ VALUES
     'Kindergarten Erweiterung',
     'Schulstraße 12, 12345 Musterstadt',
     'Anbau für 2 weitere Gruppenräume',
-    '2024-03-01',
-    '2024-09-30',
+    '2025-02-01',
+    '2025-09-30',
     'planning',
     '#F59E0B',
     '550e8400-e29b-41d4-a716-446655440000',
@@ -61,8 +61,8 @@ VALUES
   )
 ON CONFLICT (id) DO NOTHING;
 
--- Test-Aufgaben erstellen
-INSERT INTO public.tasks (id, title, description, project_id, assigned_to, status, priority, start_date, end_date, start_time, end_time, color)
+-- Test-Aufgaben mit aktuellen Datumsangaben erstellen
+INSERT INTO public.tasks (id, title, description, project_id, assigned_to, status, priority, start_date, end_date, color)
 VALUES 
   (
     '550e8400-e29b-41d4-a716-446655440005',
@@ -72,10 +72,8 @@ VALUES
     '550e8400-e29b-41d4-a716-446655440001',
     'in_progress',
     'high',
-    '2024-01-15',
-    '2024-01-20',
-    '08:00',
-    '16:00',
+    '2024-12-01',
+    '2024-12-15',
     '#3B82F6'
   ),
   (
@@ -86,10 +84,8 @@ VALUES
     '550e8400-e29b-41d4-a716-446655440001',
     'pending',
     'medium',
-    '2024-01-25',
-    '2024-02-15',
-    '07:00',
-    '15:00',
+    '2024-12-20',
+    '2025-01-15',
     '#3B82F6'
   ),
   (
@@ -100,10 +96,8 @@ VALUES
     '550e8400-e29b-41d4-a716-446655440001',
     'pending',
     'high',
-    '2024-02-20',
-    '2024-03-10',
-    '07:00',
-    '15:00',
+    '2025-01-20',
+    '2025-02-10',
     '#3B82F6'
   ),
   (
@@ -114,10 +108,8 @@ VALUES
     '550e8400-e29b-41d4-a716-446655440001',
     'in_progress',
     'urgent',
-    '2024-02-01',
-    '2024-02-28',
-    '09:00',
-    '17:00',
+    '2025-01-15',
+    '2025-02-28',
     '#10B981'
   ),
   (
@@ -128,10 +120,8 @@ VALUES
     '550e8400-e29b-41d4-a716-446655440001',
     'pending',
     'medium',
-    '2024-03-01',
-    '2024-03-15',
-    '08:00',
-    '16:00',
+    '2025-03-01',
+    '2025-03-15',
     '#10B981'
   ),
   (
@@ -142,10 +132,8 @@ VALUES
     '550e8400-e29b-41d4-a716-446655440001',
     'pending',
     'urgent',
-    '2024-03-01',
-    '2024-04-30',
-    '09:00',
-    '17:00',
+    '2025-02-01',
+    '2025-04-30',
     '#F59E0B'
   )
 ON CONFLICT (id) DO NOTHING; 

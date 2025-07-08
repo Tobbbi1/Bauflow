@@ -59,13 +59,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Keine Berechtigung zum Bearbeiten dieser Aufgabe' }, { status: 403 })
     }
 
+    // assigned_to korrekt behandeln (kann NULL sein)
+    const updateFields = {
+      ...updateData,
+      assigned_to: updateData.assigned_to || null, // Leerer String wird zu NULL
+      updated_at: new Date().toISOString()
+    }
+
+    console.log('Updating task with data:', updateFields)
+
     // Aufgabe aktualisieren
     const { data, error } = await supabase
       .from('tasks')
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateFields)
       .eq('id', id)
       .select()
       .single()

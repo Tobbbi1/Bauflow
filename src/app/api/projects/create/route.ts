@@ -1,90 +1,46 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
-    // Token aus dem Header holen
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    );
-    
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError)
-      return NextResponse.json(
-        { error: 'Nicht authentifiziert' },
-        { status: 401 }
-      )
-    }
-
-    console.log('User authenticated:', user.id)
-
-    // Get user profile to verify company_id
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('company_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile) {
-      console.error('Profile error:', profileError)
-      return NextResponse.json(
-        { error: 'Benutzerprofil nicht gefunden' },
-        { status: 404 }
-      )
-    }
-
-    console.log('Profile loaded:', { company_id: profile.company_id, role: profile.role })
-
+    const supabase = createClient()
     const body = await request.json()
-    
-    const projectData = {
-      ...body,
-      created_by: user.id,
-      company_id: profile.company_id
+
+    const { name, customer_id, description, address, color } = body
+
+    if (!name) {
+      return NextResponse.json({ error: 'Name ist erforderlich' }, { status: 400 })
     }
 
-    console.log('Attempting to insert project with data:', projectData)
-    
-    // Create the project with server-side context (RLS still applies but works correctly)
-    const { data, error } = await supabase
+    const { data: project, error } = await supabase
       .from('projects')
-      .insert(projectData)
-      .select()
+      .insert({
+        name,
+        customer_id,
+        description,
+        address,
+        color: color || '#10B981'
+      })
+      .select(`
+        *,
+        customers (
+          id,
+          name,
+          contact_person,
+          contact_phone,
+          contact_email
+        )
+      `)
       .single()
 
     if (error) {
-      console.error('Project creation error:', error)
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      })
-      return NextResponse.json(
-        { error: `Fehler beim Erstellen der Baustelle: ${error.message}` },
-        { status: 500 }
-      )
+      console.error('Error creating project:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('Project created successfully:', data)
-
-    return NextResponse.json({
-      message: 'Baustelle erfolgreich erstellt',
-      data: data
-    })
-
+    return NextResponse.json(project)
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Ein unerwarteter Fehler ist aufgetreten' },
-      { status: 500 }
-    )
+    console.error('Server error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

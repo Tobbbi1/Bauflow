@@ -1,337 +1,309 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation'
-import { 
-  Settings, 
-  Building2, 
-  Save, 
-  Loader2, 
-  CheckCircle, 
-  AlertCircle,
-  ArrowLeft
-} from 'lucide-react'
-import Link from 'next/link'
+import { Plus, Edit, Trash2, Users, UserPlus, Package } from 'lucide-react'
 
-interface Company {
+interface Employee {
+  id: string
+  first_name: string
+  last_name: string
+  initials: string
+  color: string
+  role: string
+  phone?: string
+  email?: string
+  hourly_rate: number
+}
+
+interface Customer {
   id: string
   name: string
-  address: string | null
-  phone: string | null
-  email: string | null
-  website: string | null
-  logo_url: string | null
+  address?: string
+  contact_person?: string
+  contact_phone?: string
+  contact_email?: string
+}
+
+interface Material {
+  id: string
+  name: string
+  description?: string
+  unit?: string
+  price_per_unit?: number
+  supplier?: string
+  stock_quantity?: number
 }
 
 export default function SettingsPage() {
-  const [company, setCompany] = useState<Company | null>(null)
+  const [activeTab, setActiveTab] = useState('employees')
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    website: '',
-    logo_url: ''
-  })
-  
-  const supabase = createClientComponentClient()
-  const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
+    fetchData()
+  }, [])
 
-      // Prüfe Benutzer-Rolle
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role !== 'admin' && profile?.role !== 'manager') {
-        router.push('/app')
-        return
-      }
-
-      loadCompanyData()
-    }
-
-    checkAuth()
-  }, [supabase, router])
-
-  const loadCompanyData = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/company/update', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+      const [employeesRes, customersRes, materialsRes] = await Promise.all([
+        fetch('/api/employees/list'),
+        fetch('/api/customers/list'),
+        fetch('/api/materials/list')
+      ])
 
-      if (response.ok) {
-        const data = await response.json()
-        setCompany(data.company)
-        setFormData({
-          name: data.company.name || '',
-          address: data.company.address || '',
-          phone: data.company.phone || '',
-          email: data.company.email || '',
-          website: data.company.website || '',
-          logo_url: data.company.logo_url || ''
-        })
-      } else {
-        setMessage({ type: 'error', text: 'Fehler beim Laden der Firmen-Daten' })
-      }
+      if (employeesRes.ok) setEmployees(await employeesRes.json())
+      if (customersRes.ok) setCustomers(await customersRes.json())
+      if (materialsRes.ok) setMaterials(await materialsRes.json())
     } catch (error) {
-      setMessage({ type: 'error', text: 'Fehler beim Laden der Daten' })
+      console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    setMessage(null)
+  const deleteItem = async (type: string, id: string) => {
+    if (!confirm('Möchten Sie diesen Eintrag wirklich löschen?')) return
 
     try {
-      const response = await fetch('/api/company/update', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-
-      const data = await response.json()
-
+      const response = await fetch(`/api/${type}/delete?id=${id}`, { method: 'DELETE' })
       if (response.ok) {
-        setMessage({ type: 'success', text: data.message })
-        setCompany(data.company)
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Fehler beim Speichern' })
+        fetchData()
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Fehler beim Speichern der Daten' })
-    } finally {
-      setSaving(false)
+      console.error('Error deleting item:', error)
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+  const tabs = [
+    { id: 'employees', label: 'Mitarbeiter', icon: Users, count: employees.length },
+    { id: 'customers', label: 'Kunden', icon: UserPlus, count: customers.length },
+    { id: 'materials', label: 'Materialien', icon: Package, count: materials.length }
+  ]
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="p-8 flex items-center justify-center min-h-96">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-600">Lade Einstellungen...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Einstellungen werden geladen...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/app" 
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-slate-600" />
-              </Link>
-              <div className="flex items-center gap-3">
-                <Settings className="w-6 h-6 text-blue-600" />
-                <h1 className="text-xl font-semibold text-slate-900">Einstellungen</h1>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Einstellungen</h1>
+        <p className="text-slate-600">Verwalten Sie Mitarbeiter, Kunden und Materialien</p>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Firmen-Daten Sektion */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Building2 className="w-6 h-6 text-blue-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Firmen-Daten</h2>
-          </div>
-          
-          <p className="text-slate-600 mb-6">
-            Diese Daten werden für Stundenzettel und andere Dokumente verwendet. 
-            Stellen Sie sicher, dass alle Informationen korrekt sind.
-          </p>
+      {/* Tabs */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
+        <div className="border-b border-slate-200">
+          <nav className="flex space-x-8 px-6">
+            {tabs.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                  <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-full text-xs">
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
+          </nav>
+        </div>
 
-          {/* Nachrichten */}
-          {message && (
-            <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-              message.type === 'success' 
-                ? 'bg-green-50 border border-green-200 text-green-800' 
-                : 'bg-red-50 border border-red-200 text-red-800'
-            }`}>
-              {message.type === 'success' ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
+        {/* Tab Content */}
+        <div className="p-6">
+          {/* Employees Tab */}
+          {activeTab === 'employees' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-slate-900">Mitarbeiter verwalten</h2>
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Mitarbeiter hinzufügen
+                </button>
+              </div>
+
+              {employees.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Keine Mitarbeiter</h3>
+                  <p className="text-slate-600">Fügen Sie Ihren ersten Mitarbeiter hinzu.</p>
+                </div>
               ) : (
-                <AlertCircle className="w-5 h-5 text-red-600" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {employees.map((employee) => (
+                    <div key={employee.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium"
+                          style={{ backgroundColor: employee.color }}
+                        >
+                          {employee.initials}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-slate-900">
+                            {employee.first_name} {employee.last_name}
+                          </p>
+                          <p className="text-sm text-slate-600 capitalize">{employee.role}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1 text-sm text-slate-600 mb-3">
+                        {employee.phone && <p>📞 {employee.phone}</p>}
+                        {employee.email && <p>✉️ {employee.email}</p>}
+                        <p>💰 {employee.hourly_rate}€/h</p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button className="flex-1 px-3 py-1 text-slate-600 hover:bg-slate-100 rounded-md text-sm transition-colors">
+                          <Edit className="w-4 h-4 inline mr-1" />
+                          Bearbeiten
+                        </button>
+                        <button 
+                          onClick={() => deleteItem('employees', employee.id)}
+                          className="px-3 py-1 text-red-600 hover:bg-red-50 rounded-md text-sm transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-              <span className="font-medium">{message.text}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Firmenname */}
-              <div className="md:col-span-2">
-                <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
-                  Firmenname *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Ihr Firmenname"
-                />
+          {/* Customers Tab */}
+          {activeTab === 'customers' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-slate-900">Kunden verwalten</h2>
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Kunde hinzufügen
+                </button>
               </div>
 
-              {/* Adresse */}
-              <div className="md:col-span-2">
-                <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-2">
-                  Adresse
-                </label>
-                <textarea
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Straße, Hausnummer, PLZ, Ort"
-                />
-              </div>
-
-              {/* Telefon */}
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
-                  Telefon
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="+49 123 456789"
-                />
-              </div>
-
-              {/* E-Mail */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                  E-Mail
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="info@ihrefirma.de"
-                />
-              </div>
-
-              {/* Website */}
-              <div>
-                <label htmlFor="website" className="block text-sm font-medium text-slate-700 mb-2">
-                  Website
-                </label>
-                <input
-                  type="url"
-                  id="website"
-                  name="website"
-                  value={formData.website}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="https://www.ihrefirma.de"
-                />
-              </div>
-
-              {/* Logo URL */}
-              <div>
-                <label htmlFor="logo_url" className="block text-sm font-medium text-slate-700 mb-2">
-                  Logo URL
-                </label>
-                <input
-                  type="url"
-                  id="logo_url"
-                  name="logo_url"
-                  value={formData.logo_url}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="https://example.com/logo.png"
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  URL zu Ihrem Firmenlogo (wird auf Stundenzetteln angezeigt)
-                </p>
-              </div>
+              {customers.length === 0 ? (
+                <div className="text-center py-12">
+                  <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Keine Kunden</h3>
+                  <p className="text-slate-600">Fügen Sie Ihren ersten Kunden hinzu.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {customers.map((customer) => (
+                    <div key={customer.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-slate-900 mb-1">{customer.name}</h3>
+                          {customer.address && <p className="text-sm text-slate-600 mb-1">{customer.address}</p>}
+                          {customer.contact_person && (
+                            <p className="text-sm text-slate-600">
+                              Ansprechpartner: {customer.contact_person}
+                            </p>
+                          )}
+                          {customer.contact_phone && (
+                            <p className="text-sm text-slate-600">Tel: {customer.contact_phone}</p>
+                          )}
+                          {customer.contact_email && (
+                            <p className="text-sm text-slate-600">E-Mail: {customer.contact_email}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="px-3 py-1 text-slate-600 hover:bg-slate-100 rounded-md text-sm transition-colors">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteItem('customers', customer.id)}
+                            className="px-3 py-1 text-red-600 hover:bg-red-50 rounded-md text-sm transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Speichern Button */}
-            <div className="flex justify-end pt-6 border-t border-slate-200">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {saving ? 'Speichere...' : 'Speichern'}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Materials Tab */}
+          {activeTab === 'materials' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-slate-900">Materialien verwalten</h2>
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Material hinzufügen
+                </button>
+              </div>
 
-        {/* Info-Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-white text-xs font-bold">i</span>
+              {materials.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Keine Materialien</h3>
+                  <p className="text-slate-600">Fügen Sie Ihr erstes Material hinzu.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {materials.map((material) => (
+                    <div key={material.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-slate-900 mb-1">{material.name}</h3>
+                          {material.description && (
+                            <p className="text-sm text-slate-600 mb-1">{material.description}</p>
+                          )}
+                          <div className="flex gap-4 text-sm text-slate-600">
+                            {material.unit && <span>Einheit: {material.unit}</span>}
+                            {material.price_per_unit && (
+                              <span>Preis: {material.price_per_unit.toFixed(2)} €/{material.unit}</span>
+                            )}
+                            {material.supplier && <span>Lieferant: {material.supplier}</span>}
+                          </div>
+                          {material.stock_quantity !== undefined && (
+                            <p className="text-sm text-slate-600 mt-1">
+                              Lager: {material.stock_quantity} {material.unit}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="px-3 py-1 text-slate-600 hover:bg-slate-100 rounded-md text-sm transition-colors">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteItem('materials', material.id)}
+                            className="px-3 py-1 text-red-600 hover:bg-red-50 rounded-md text-sm transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div>
-              <h3 className="font-medium text-blue-900 mb-1">Wichtiger Hinweis</h3>
-              <p className="text-sm text-blue-800">
-                Die hier eingegebenen Firmen-Daten werden automatisch auf allen Stundenzetteln 
-                und anderen Dokumenten verwendet. Stellen Sie sicher, dass alle Informationen 
-                korrekt und aktuell sind.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

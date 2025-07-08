@@ -1,59 +1,47 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    
-    // Authentifizierung prüfen
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
-    }
+    const supabase = createClient()
+    const body = await request.json()
 
-    const { id, ...updateData } = await request.json()
-    
+    const { id, name, customer_id, description, address, color } = body
+
     if (!id) {
-      return NextResponse.json({ error: 'Baustellen-ID erforderlich' }, { status: 400 })
+      return NextResponse.json({ error: 'ID ist erforderlich' }, { status: 400 })
     }
 
-    // Benutzerprofil und Berechtigungen prüfen
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('company_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Benutzerprofil nicht gefunden' }, { status: 404 })
-    }
-
-    // Prüfen ob Benutzer Admin oder Manager ist
-    if (!['admin', 'manager'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Keine Berechtigung zum Bearbeiten von Baustellen' }, { status: 403 })
-    }
-
-    // Baustelle aktualisieren
-    const { data, error } = await supabase
+    const { data: project, error } = await supabase
       .from('projects')
       .update({
-        ...updateData,
-        updated_at: new Date().toISOString()
+        name,
+        customer_id,
+        description,
+        address,
+        color
       })
       .eq('id', id)
-      .eq('company_id', profile.company_id)
-      .select()
+      .select(`
+        *,
+        customers (
+          id,
+          name,
+          contact_person,
+          contact_phone,
+          contact_email
+        )
+      `)
       .single()
 
     if (error) {
-      console.error('Fehler beim Aktualisieren der Baustelle:', error)
-      return NextResponse.json({ error: 'Fehler beim Aktualisieren der Baustelle' }, { status: 500 })
+      console.error('Error updating project:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ data })
+    return NextResponse.json(project)
   } catch (error) {
-    console.error('Unerwarteter Fehler:', error)
-    return NextResponse.json({ error: 'Interner Serverfehler' }, { status: 500 })
+    console.error('Server error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

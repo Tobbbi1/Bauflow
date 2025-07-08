@@ -363,13 +363,28 @@ export default function BaustellenList() {
                   {b.start_date && new Date(b.start_date).toLocaleDateString()} - {b.end_date && new Date(b.end_date).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      b.status === 'active' ? 'bg-green-100 text-green-800' :
-                      b.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-slate-100 text-slate-800'
-                  }`}>
-                    {b.status === 'active' ? 'Aktiv' : b.status === 'planning' ? 'Planung' : b.status}
-                  </span>
+                  <select
+                    value={b.status}
+                    onChange={async (e) => {
+                      const newStatus = e.target.value;
+                      const { data: { session } } = await supabase.auth.getSession();
+                      await fetch('/api/projects/update', {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({ ...b, status: newStatus }),
+                      });
+                      setBaustellen(prev => prev.map(baustelle => b.id === b.id ? { ...baustelle, status: newStatus } : baustelle));
+                    }}
+                    className="input-field"
+                  >
+                    <option value="planning">Planung</option>
+                    <option value="in_progress">In Bearbeitung</option>
+                    <option value="completed">Abgeschlossen</option>
+                    <option value="cancelled">Abgebrochen</option>
+                  </select>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button 

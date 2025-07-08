@@ -35,19 +35,28 @@ export async function POST(request: NextRequest) {
       .from('projects')
       .select('id, color')
       .eq('id', taskData.project_id)
-      .eq('company_id', profile.company_id)
       .single()
 
     if (projectError || !project) {
+      console.log(project)
       return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
     }
 
-    // Aufgabe erstellen
+    console.log('Task data to insert:', taskData)
+    
+    // Aufgabe erstellen - assigned_to kann NULL sein
     const { data, error } = await supabase
       .from('tasks')
       .insert({
-        ...taskData,
+        title: taskData.title,
+        description: taskData.description,
+        project_id: taskData.project_id,
+        assigned_to: taskData.assigned_to || null, // Kann NULL sein
         assigned_by: user.id,
+        status: taskData.status || 'pending',
+        priority: taskData.priority || 'medium',
+        start_date: taskData.start_date,
+        end_date: taskData.end_date,
         color: project.color, // Farbe vom Projekt übernehmen
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
