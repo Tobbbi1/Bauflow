@@ -1,98 +1,93 @@
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
-  console.log('\n\n--- [REGISTER] NEW REQUEST ---')
   try {
-    const supabase = await createClient()
-    console.log('[REGISTER] 1. Supabase client created.')
-
     const body = await request.json()
-    console.log('[REGISTER] 2. Request body parsed:', { ...body, password: '[HIDDEN]' })
-    
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      companyName,
-      // We are not using these fields in the new logic, but they might come from the form
-      companyAddress,
-      companyPhone,
-      companyEmail
+    const { 
+      email, 
+      password, 
+      first_name, 
+      last_name, 
+      company_name, 
+      company_address, 
+      company_phone, 
+      company_email, 
+      company_website 
     } = body
 
-    // 1. Validate required fields
-    if (!email || !password || !firstName || !lastName || !companyName) {
-      console.error('[REGISTER] VALIDATION FAILED: Missing required fields.')
-      return NextResponse.json(
-        { error: 'Alle Pflichtfelder müssen ausgefüllt werden' },
-        { status: 400 }
-      )
+    console.log('Registration request:', { email, first_name, last_name, company_name })
+
+    if (!email || !password || !first_name || !last_name || !company_name) {
+      return NextResponse.json({ 
+        error: 'Alle Pflichtfelder müssen ausgefüllt werden' 
+      }, { status: 400 })
     }
-    console.log('[REGISTER] 3. Validation passed.')
 
-    // 2. Create the company first
-    console.log('[REGISTER] 4. Attempting to create company:', companyName)
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .insert({ 
-        name: companyName,
-        address: companyAddress,
-        phone: companyPhone,
-        email: companyEmail
-      })
-      .select('id')
-      .single()
+    // Use regular client for normal signup with email confirmation
+    const supabase = createClient()
 
-    if (companyError) {
-      console.error('[REGISTER] COMPANY CREATION ERROR:', companyError)
-      return NextResponse.json(
-        { error: `Fehler beim Erstellen der Firma: ${companyError.message}` },
-        { status: 500 }
-      )
+    // Check if user already exists
+    const adminSupabase = createAdminClient()
+    const { data: existingUsers } = await adminSupabase.auth.admin.listUsers()
+    const userExists = existingUsers?.users?.find(user => user.email === email)
+    
+    if (userExists) {
+      return NextResponse.json({ 
+        error: 'Ein Benutzer mit dieser E-Mail-Adresse existiert bereits' 
+      }, { status: 400 })
     }
-    console.log('[REGISTER] 5. Company created successfully. ID:', company.id)
 
-    // 3. Sign up the user using Supabase Auth
-    console.log('[REGISTER] 6. Attempting to sign up user with Supabase Auth:', email)
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    // 1. Sign up user with email confirmation required
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          firstName,
-          lastName,
-          company_id: company.id,
-          role: 'admin',
+          first_name,
+          last_name,
+          // Store company data in user metadata temporarily
+          pending_company: {
+            name: company_name,
+            address: company_address,
+            phone: company_phone,
+            email: company_email,
+            website: company_website
+          }
         },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify`,
-      },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`
+      }
     })
 
-    if (signUpError) {
-      console.error('[REGISTER] SUPABASE SIGN UP ERROR:', signUpError)
-      await supabase.from('companies').delete().eq('id', company.id)
-      console.log('[REGISTER] Rollback: Deleted company', company.id)
-      return NextResponse.json({ error: `Fehler bei der Benutzerregistrierung: ${signUpError.message}` }, { status: signUpError.status || 500 })
+    if (authError) {
+      console.error('Signup error:', authError)
+      return NextResponse.json({ 
+        error: `Registrierung fehlgeschlagen: ${authError.message}` 
+      }, { status: 400 })
     }
 
-    if (!data.user) {
-      console.error('[REGISTER] CRITICAL: Sign up reported success but returned no user.')
-      await supabase.from('companies').delete().eq('id', company.id)
-      console.log('[REGISTER] Rollback: Deleted company', company.id)
-      return NextResponse.json({ error: 'Benutzer konnte nicht erstellt werden, obwohl die Registrierung erfolgreich schien.' }, { status: 500 })
+    if (!authData.user) {
+      return NextResponse.json({ 
+        error: 'Benutzer konnte nicht erstellt werden' 
+      }, { status: 500 })
     }
 
-    console.log('[REGISTER] 7. User sign up successful. User ID:', data.user.id)
-    return NextResponse.json({
-      message: 'Registrierung erfolgreich. Bitte prüfen Sie Ihr Postfach, um Ihre E-Mail-Adresse zu bestätigen.',
-      user: data.user,
+    console.log('User signed up (email confirmation pending):', authData.user.id)
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Registrierung erfolgreich! Bitte prüfen Sie Ihr E-Mail-Postfach und klicken Sie auf den Bestätigungslink.',
+      requiresEmailConfirmation: true,
+      user: {
+        id: authData.user.id,
+        email: authData.user.email
+      }
     })
 
   } catch (error) {
-    console.error('[REGISTER] UNHANDLED CATCH BLOCK ERROR:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Serverfehler ist aufgetreten.'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    console.error('Unexpected registration error:', error)
+    return NextResponse.json({ 
+      error: 'Ein unerwarteter Fehler ist aufgetreten' 
+    }, { status: 500 })
   }
 } 

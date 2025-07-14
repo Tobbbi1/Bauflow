@@ -5,13 +5,10 @@ import { cookies } from 'next/headers'
 export function createClient() {
   const cookieStore = cookies()
 
-  // ... (rest of the file is correct)
-  // The key is that createClient is NOT async. The cookie handling
-  // inside the library is what's important.
-
+  // Use the anon key for authentication, not service role
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
@@ -29,10 +26,25 @@ export function createClient() {
           try {
             cookieStore.set({ name, value: '', ...options })
           } catch {
-            // The `delete` method was called from a Server Component.
+            // The `remove` method was called from a Server Component.
             // This can be ignored.
           }
         },
+      },
+    }
+  )
+}
+
+// Create admin client for operations that need elevated privileges
+export function createAdminClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        get() { return undefined },
+        set() {},
+        remove() {},
       },
     }
   )

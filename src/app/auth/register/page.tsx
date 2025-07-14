@@ -53,82 +53,48 @@ export default function RegisterPage() {
     setError('')
 
     try {
-      // 1. Sign up user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: personalData.email,
-        password: personalData.password,
-        options: {
-          data: {
-            first_name: personalData.firstName,
-            last_name: personalData.lastName
-          }
-        }
-      })
-
-      if (authError) {
-        setError(authError.message)
-        return
-      }
-
-      if (!authData.user) {
-        setError('Fehler bei der Registrierung')
-        return
-      }
-
-      // Wait a bit for user to be created
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // 2. Create company
-      const companyResponse = await fetch('/api/company/create', {
+      // Use the registration API with email confirmation
+      console.log('Submitting registration...')
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          name: companyData.name,
-          address: companyData.address,
-          phone: companyData.phone,
-          email: companyData.email,
-          website: companyData.website,
-          first_name: personalData.firstName,
-          last_name: personalData.lastName
-        })
-      })
-
-      if (!companyResponse.ok) {
-        const errorData = await companyResponse.json()
-        setError(errorData.error || 'Fehler beim Erstellen der Firma')
-        return
-      }
-
-      const company = await companyResponse.json()
-
-      // 3. Create employee record for admin
-      const employeeResponse = await fetch('/api/employees/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+          email: personalData.email,
+          password: personalData.password,
           first_name: personalData.firstName,
           last_name: personalData.lastName,
-          email: personalData.email,
-          role: 'geschäftsführer',
-          user_id: authData.user.id,
-          company_id: company.id
+          company_name: companyData.name,
+          company_address: companyData.address,
+          company_phone: companyData.phone,
+          company_email: companyData.email,
+          company_website: companyData.website
         })
       })
 
-      if (employeeResponse.ok) {
-        // Show success message or redirect
-        setError('')
-        alert('Registrierung erfolgreich! Sie können sich jetzt anmelden.')
-        router.push('/auth/login')
-      } else {
-        const employeeError = await employeeResponse.json()
-        console.error('Employee creation failed:', employeeError)
-        setError('Firma wurde erstellt, aber Mitarbeiter-Account konnte nicht angelegt werden. Bitte kontaktieren Sie den Support.')
+      const responseData = await response.json()
+      console.log('Registration response:', responseData)
+
+      if (!response.ok) {
+        setError(responseData.error || 'Fehler bei der Registrierung')
+        return
       }
 
+      if (responseData.requiresEmailConfirmation) {
+        // Show success message for email confirmation
+        setError('')
+        alert('Registrierung erfolgreich! Bitte prüfen Sie Ihr E-Mail-Postfach und klicken Sie auf den Bestätigungslink, um Ihr Konto zu aktivieren.')
+        router.push('/auth/login?message=email_confirmation_sent')
+        return
+      }
+
+      // Fallback: if no email confirmation required, redirect to app
+      router.push('/app')
+
     } catch (error) {
-      setError('Ein unerwarteter Fehler ist aufgetreten')
       console.error('Registration error:', error)
+      setError('Ein unerwarteter Fehler ist aufgetreten')
     } finally {
       setLoading(false)
     }
@@ -181,7 +147,7 @@ export default function RegisterPage() {
                   required
                   value={personalData.firstName}
                   onChange={(e) => setPersonalData(prev => ({ ...prev, firstName: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
                   placeholder="Max"
                 />
               </div>
@@ -198,7 +164,7 @@ export default function RegisterPage() {
                   required
                   value={personalData.lastName}
                   onChange={(e) => setPersonalData(prev => ({ ...prev, lastName: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
                   placeholder="Mustermann"
                 />
               </div>
@@ -215,7 +181,7 @@ export default function RegisterPage() {
                   required
                   value={personalData.email}
                   onChange={(e) => setPersonalData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
                   placeholder="max@beispiel.de"
                 />
               </div>
@@ -232,7 +198,7 @@ export default function RegisterPage() {
                   required
                   value={personalData.password}
                   onChange={(e) => setPersonalData(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
                   placeholder="Mindestens 6 Zeichen"
                 />
               </div>
@@ -249,7 +215,7 @@ export default function RegisterPage() {
                   required
                   value={personalData.confirmPassword}
                   onChange={(e) => setPersonalData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
                   placeholder="Passwort wiederholen"
                 />
               </div>
@@ -284,8 +250,8 @@ export default function RegisterPage() {
                   required
                   value={companyData.name}
                   onChange={(e) => setCompanyData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Mustermann Bau GmbH"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                  placeholder="Mustermann GmbH"
                 />
               </div>
             </div>
@@ -300,8 +266,8 @@ export default function RegisterPage() {
                   type="text"
                   value={companyData.address}
                   onChange={(e) => setCompanyData(prev => ({ ...prev, address: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Musterstraße 123, 12345 Musterstadt"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                  placeholder="Musterstraße 1, 12345 Berlin"
                 />
               </div>
             </div>
@@ -316,15 +282,15 @@ export default function RegisterPage() {
                   type="tel"
                   value={companyData.phone}
                   onChange={(e) => setCompanyData(prev => ({ ...prev, phone: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="+49 123 456789"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                  placeholder="+49 30 12345678"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Firmen-E-Mail
+                E-Mail (Firma)
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -332,8 +298,8 @@ export default function RegisterPage() {
                   type="email"
                   value={companyData.email}
                   onChange={(e) => setCompanyData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="info@mustermann-bau.de"
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                  placeholder="info@mustermann.de"
                 />
               </div>
             </div>
@@ -346,8 +312,8 @@ export default function RegisterPage() {
                 type="url"
                 value={companyData.website}
                 onChange={(e) => setCompanyData(prev => ({ ...prev, website: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="https://www.mustermann-bau.de"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                placeholder="https://www.mustermann.de"
               />
             </div>
 

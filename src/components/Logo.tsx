@@ -1,45 +1,65 @@
 'use client'
 
-import React from 'react';
+import Link from 'next/link'
 
-const Logo = () => {
+export default function Logo() {
   return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="text-blue-600"
-    >
-      <style>
-        {`
-          .bar1, .bar2, .bar3 {
-            animation: grow 1.5s ease-in-out infinite alternate;
-          }
-          .bar2 {
-            animation-delay: 0.25s;
-          }
-          .bar3 {
-            animation-delay: 0.5s;
-          }
-          @keyframes grow {
-            0% {
-              transform: scaleY(0.3);
-            }
-            100% {
-              transform: scaleY(1);
-            }
-          }
-        `}
-      </style>
-      <g transform="translate(0, 24) scale(1, -1)">
-        <rect className="bar1" x="4" y="0" width="4" height="16" rx="1" fill="currentColor" transform-origin="bottom" />
-        <rect className="bar2" x="10" y="0" width="4" height="20" rx="1" fill="currentColor" transform-origin="bottom" />
-        <rect className="bar3" x="16" y="0" width="4" height="12" rx="1" fill="currentColor" transform-origin="bottom" />
-      </g>
-    </svg>
-  );
-};
-
-export default Logo; 
+    <Link href="/" className="flex items-center space-x-2">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="text-blue-600"
+      >
+        <rect
+          x="4"
+          y="8"
+          width="8"
+          height="8"
+          fill="currentColor"
+          className="animate-pulse"
+          style={{ transformOrigin: 'center' }}
+        />
+        <rect
+          x="4"
+          y="18"
+          width="8"
+          height="8"
+          fill="currentColor"
+          className="animate-pulse"
+          style={{ transformOrigin: 'center', animationDelay: '0.5s' }}
+        />
+        <rect
+          x="14"
+          y="8"
+          width="8"
+          height="8"
+          fill="currentColor"
+          className="animate-pulse"
+          style={{ transformOrigin: 'center', animationDelay: '1s' }}
+        />
+        <rect
+          x="14"
+          y="18"
+          width="8"
+          height="8"
+          fill="currentColor"
+          className="animate-pulse"
+          style={{ transformOrigin: 'center', animationDelay: '1.5s' }}
+        />
+        <rect
+          x="24"
+          y="8"
+          width="4"
+          height="18"
+          fill="currentColor"
+          className="animate-pulse"
+          style={{ transformOrigin: 'center', animationDelay: '2s' }}
+        />
+      </svg>
+      <span className="text-xl font-bold text-gray-900">BauPlaner</span>
+    </Link>
+  )
+} 
